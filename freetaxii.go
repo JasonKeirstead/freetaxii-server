@@ -20,20 +20,19 @@ type ConfigFileType struct {
 	System struct {
 		Debug   int
 		LogFile string
+		Listen  string
 	}
 	Services struct {
-		DiscoveryServer  string
-		CollectionServer string
+		Discovery  string
+		Collection string
+		Poll       string
 	}
 }
 
 var sVersion = "0.1"
 var DebugLevel int = 0
 
-//var sOptPort = getopt.StringLong("port", 'p', "8000", "Port Number (ex. 8000)", "string")
 var sOptConfigFile = getopt.StringLong("config", 'c', "etc/freetaxii.conf", "Configuration File", "string")
-var sOptDiscovery = getopt.StringLong("discovery-server", 0, "/services/discovery", "Service Directory for Discovery Service (ex. /services/discovery)", "string")
-var sOptCollection = getopt.StringLong("collection-server", 0, "/services/collection", "Service Directory for Collection Service (ex. /services/collection)", "string")
 var sOptLogFile = getopt.StringLong("logfile", 'f', "log/freetaxii.log", "Server Log File", "string")
 var bOptHelp = getopt.BoolLong("help", 0, "Help")
 var bOptVer = getopt.BoolLong("version", 0, "Version")
@@ -77,9 +76,10 @@ func main() {
 	// --------------------------------------------------
 	// Setup Logging File
 	// --------------------------------------------------
-	// The default open for the logs in ./etc/freetaxii.log
-	// If there is an option in the configuration file it will take precedence over the default
-	// If a command line option is give, it will take precidence over the configuration file
+	// The default location for the logs is ./etc/freetaxii.log
+	// If a log file location is passed in via the command line flags, then lets
+	// use it. Otherwise, lets look in the configuration file.  If nothing is
+	// there, then we will use the default.
 
 	// TODO
 	// Need to make the directory if it does not already exist
@@ -87,7 +87,9 @@ func main() {
 	// take the last bit in case there is multiple directories /etc/foo/bar/stuff.log
 
 	var sysLogFile string
-	if *sOptLogFile == "log/freetaxii.log" && syscfg.System.LogFile != "" {
+	if *sOptLogFile != "log/freetaxii.log" {
+		sysLogFile = *sOptLogFile
+	} else if syscfg.System.LogFile != "" {
 		sysLogFile = syscfg.System.LogFile
 	} else {
 		sysLogFile = *sOptLogFile
@@ -105,19 +107,46 @@ func main() {
 	// --------------------------------------------------
 	// Setup Directory Path Handlers
 	// --------------------------------------------------
+	// Make sure there is a directory path defined in the configuration file
+	// for each service we want to listen on.
 
 	var taxiiServer httpHandlers.HttpHandlersType
 	taxiiServer.DebugLevel = DebugLevel
+	serviceCounter := 0
 
-	http.HandleFunc(*sOptDiscovery, taxiiServer.DiscoveryServerHandler)
-	http.HandleFunc(*sOptCollection, taxiiServer.CollectionServerHandler)
+	if syscfg.Services.Discovery != "" {
+		log.Println("TAXII Discovery services defined at:", syscfg.Services.Discovery)
+		http.HandleFunc(syscfg.Services.Discovery, taxiiServer.DiscoveryServerHandler)
+		serviceCounter++
+	}
+
+	if syscfg.Services.Collection != "" {
+		log.Println("TAXII Collection services defined at:", syscfg.Services.Collection)
+		http.HandleFunc(syscfg.Services.Collection, taxiiServer.CollectionServerHandler)
+		serviceCounter++
+	}
+
+	if syscfg.Services.Poll != "" {
+		log.Println("TAXII Poll services defined at:", syscfg.Services.Poll)
+		http.HandleFunc(syscfg.Services.Poll, taxiiServer.PollServerHandler)
+		serviceCounter++
+	}
+
+	if serviceCounter == 0 {
+		log.Fatalln("No TAXII services are defined")
+	}
 
 	// --------------------------------------------------
 	// Listen for Incoming Connections
 	// --------------------------------------------------
 
-	// TODO connect this up to the command line flags
-	http.ListenAndServe(":8000", nil)
+	// TODO - Need to verify the list address is a valid IPv4 address and port
+	// combination.
+	if syscfg.System.Listen != "" {
+		http.ListenAndServe(syscfg.System.Listen, nil)
+	} else {
+		log.Fatalln("The listen directive is missing from the configuration file")
+	}
 
 }
 

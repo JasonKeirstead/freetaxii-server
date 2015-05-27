@@ -8,27 +8,24 @@ package responseMessages
 
 import (
 	"encoding/json"
-	"github.com/freetaxii/libtaxii/status"
+	"github.com/freetaxii/libtaxii/poll"
 	"log"
 )
 
 // --------------------------------------------------
-// Create a TAXII Status Message
+// Create a TAXII Discovery Response Message
 // --------------------------------------------------
 
-func CreateTaxiiStatusMessage(responseid, msgType, msg string) []byte {
-	tm := status.New()
-	tm.AddType(msgType)
-	if responseid != "" {
-		tm.AddResponseId(responseid)
-	}
-	tm.AddMessage(msg)
+func CreatePollResponse(responseid, collectionName string) []byte {
+	tm := poll.NewResponse()
+	tm.AddInResponseTo(responseid)
+	tm.AddCollectionName(collectionName)
 
 	data, err := json.Marshal(tm)
 	if err != nil {
-		// If we can not create a discovery response then there is something
+		// If we can not create a status message then there is something
 		// wrong with the APIs and nothing is going to work.
-		log.Fatal("Unable to create Discovery Response Message")
+		log.Fatal("Unable to create Poll Response Message")
 	}
 	return data
 }

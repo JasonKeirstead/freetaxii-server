@@ -17,8 +17,8 @@ import (
 // --------------------------------------------------
 
 func CreateDiscoveryResponse(responseid string) []byte {
-	pkg, m := discovery.NewResponse()
-	m.AddInResponseTo(responseid)
+	tm := discovery.NewResponse()
+	tm.AddInResponseTo(responseid)
 
 	var s1 discovery.ServiceType
 	s1.SetTypeDiscovery()
@@ -32,10 +32,10 @@ func CreateDiscoveryResponse(responseid string) []byte {
 	s2.SetStandardTaxiiHttpJson()
 	s2.AddAddress("http://taxiitest.freetaxii.com/services/collection")
 
-	m.AddService(s1)
-	m.AddService(s2)
+	tm.AddService(s1)
+	tm.AddService(s2)
 
-	data, err := json.Marshal(pkg)
+	data, err := json.Marshal(tm)
 	if err != nil {
 		// If we can not create a status message then there is something
 		// wrong with the APIs and nothing is going to work.

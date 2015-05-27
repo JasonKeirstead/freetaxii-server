@@ -37,7 +37,7 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "Bad Message", err.Error())
+		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		w.Write(statusMessageData)
 		return
 	}
@@ -51,7 +51,7 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 	err = decoder.Decode(&reqPayload)
 
 	if err != nil {
-		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "Bad Message", "Can not decode Discovery Request")
+		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
 		w.Write(statusMessageData)
 		return
 	}
@@ -60,7 +60,7 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 
 	// Check to make sure their is a message ID in the request message
 	if requestMsg.Id == "" {
-		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "Bad Message", "Discovery Request message did not include an ID")
+		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
 		w.Write(statusMessageData)
 		return
 	}

@@ -17,8 +17,8 @@ import (
 // --------------------------------------------------
 
 func CreateCollectionResponse(responseid string) []byte {
-	pkg, m := collection.NewResponse()
-	m.AddInResponseTo(responseid)
+	tm := collection.NewResponse()
+	tm.AddInResponseTo(responseid)
 
 	c1 := collection.CreateCollection()
 	c1.AddName("ip-watch-list")
@@ -30,9 +30,9 @@ func CreateCollectionResponse(responseid string) []byte {
 	//c1.SetSubscriptionServiceToHttpJson("http://taxiitest.freetaxii.com/services/collection-management/")
 	//c1.SetInboxServiceToHttpJson("http://taxiitest.freetaxii.com/services/inbox/")
 
-	m.AddCollection(c1)
+	tm.AddCollection(c1)
 
-	data, err := json.Marshal(pkg)
+	data, err := json.Marshal(tm)
 	if err != nil {
 		// If we can not create a status message then there is something
 		// wrong with the APIs and nothing is going to work.

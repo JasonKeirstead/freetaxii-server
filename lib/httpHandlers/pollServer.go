@@ -9,12 +9,13 @@ package httpHandlers
 import (
 	"encoding/json"
 	"github.com/freetaxii/freetaxii-server/lib/responseMessages"
-	"github.com/freetaxii/libtaxii/collection"
+	"github.com/freetaxii/libtaxii/poll"
 	"log"
 	"net/http"
+	"strings"
 )
 
-func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {
+func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	// We need to put this first so that during debugging we can see problems
@@ -47,11 +48,11 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 	// --------------------------------------------------
 	// Use decoder instead of unmarshal so we can handle stream data
 	decoder := json.NewDecoder(r.Body)
-	var reqPayload collection.TaxiiCollectionRequestType
+	var reqPayload poll.TaxiiPollRequestType
 	err = decoder.Decode(&reqPayload)
 
 	if err != nil {
-		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Collection Request")
+		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
 		w.Write(statusMessageData)
 		return
 	}
@@ -60,16 +61,26 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 
 	// Check to make sure their is a message ID in the request message
 	if requestMsg.Id == "" {
-		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Collection Request message did not include an ID")
+		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
 		w.Write(statusMessageData)
 		return
 	}
 
 	if this.DebugLevel >= 1 {
-		log.Printf("%s, Found TAXII Collection Request Message with ID: %s", r.RemoteAddr, requestMsg.Id)
+		log.Printf("Found TAXII Poll Request Message from %s with ID: %s", r.RemoteAddr, requestMsg.Id)
 	}
 
-	data := responseMessages.CreateCollectionResponse(requestMsg.Id)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(data)
+	// --------------------------------------------------
+	// Check for valid collection
+	// --------------------------------------------------
+
+	if strings.ToLower(requestMsg.CollectionName) == "watch-list" {
+		data := responseMessages.CreatePollResponse(requestMsg.Id, "watch-list")
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write(data)
+	} else {
+		statusMessageData := responseMessages.CreateTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", "The requested collection does not exist")
+		w.Write(statusMessageData)
+	}
+
 }
