@@ -49,14 +49,11 @@ func main() {
 	getopt.Parse()
 
 	if *bOptVer {
-		printOutputHeader()
-		os.Exit(0)
+		printVersion()
 	}
 
 	if *bOptHelp {
-		printOutputHeader()
-		getopt.Usage()
-		os.Exit(0)
+		printHelp()
 	}
 
 	// --------------------------------------------------
@@ -157,6 +154,17 @@ func main() {
 //     if os.IsNotExist(err) { return false, nil }
 //     return false, err
 // }
+
+func printHelp() {
+	printOutputHeader()
+	getopt.Usage()
+	os.Exit(0)
+}
+
+func printVersion() {
+	printOutputHeader()
+	os.Exit(0)
+}
 
 // --------------------------------------------------
 // Print a header for all output
