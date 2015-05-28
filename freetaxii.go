@@ -16,6 +16,11 @@ import (
 	"os"
 )
 
+const (
+	DEFAULT_CONFIG_FILENAME = "etc/freetaxii.conf"
+	DEFAULT_LOG_FILENAME    = "logs/freetaxii.log"
+)
+
 type ConfigFileType struct {
 	System struct {
 		Debug   int
@@ -32,8 +37,8 @@ type ConfigFileType struct {
 var sVersion = "0.1"
 var DebugLevel int = 0
 
-var sOptConfigFile = getopt.StringLong("config", 'c', "etc/freetaxii.conf", "Configuration File", "string")
-var sOptLogFile = getopt.StringLong("logfile", 'f', "log/freetaxii.log", "Server Log File", "string")
+var sOptConfigFilename = getopt.StringLong("config", 'c', DEFAULT_CONFIG_FILENAME, "Configuration File", "string")
+var sOptLogFilename = getopt.StringLong("logfile", 'f', DEFAULT_LOG_FILENAME, "Server Log File", "string")
 var bOptHelp = getopt.BoolLong("help", 0, "Help")
 var bOptVer = getopt.BoolLong("version", 0, "Version")
 
@@ -58,9 +63,9 @@ func main() {
 	// Load Configuration File
 	// --------------------------------------------------
 
-	sysConfigFile := *sOptConfigFile
+	sysConfigFilename := *sOptConfigFilename
 	var syscfg ConfigFileType
-	err := gcfg.ReadFileInto(&syscfg, sysConfigFile)
+	err := gcfg.ReadFileInto(&syscfg, sysConfigFilename)
 	if err != nil {
 		log.Fatalf("error opening configuration file: %v", err)
 	}
@@ -86,16 +91,12 @@ func main() {
 	// To do this, we need to split the filename from the directory, we will want to only
 	// take the last bit in case there is multiple directories /etc/foo/bar/stuff.log
 
-	var sysLogFile string
-	if *sOptLogFile != "log/freetaxii.log" {
-		sysLogFile = *sOptLogFile
-	} else if syscfg.System.LogFile != "" {
-		sysLogFile = syscfg.System.LogFile
-	} else {
-		sysLogFile = *sOptLogFile
+	sysLogFilename := *sOptLogFilename
+	if sysLogFilename == DEFAULT_LOG_FILENAME && syscfg.System.LogFile != "" {
+		sysLogFilename = syscfg.System.LogFile
 	}
 
-	logFile, err := os.OpenFile(sysLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(sysLogFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
