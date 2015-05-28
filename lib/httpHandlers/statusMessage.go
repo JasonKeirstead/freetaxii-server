@@ -16,7 +16,7 @@ import (
 // Create a TAXII Status Message
 // --------------------------------------------------
 
-func CreateTaxiiStatusMessage(responseid, msgType, msg string) []byte {
+func createTaxiiStatusMessage(responseid, msgType, msg string) []byte {
 	tm := status.New()
 	tm.AddType(msgType)
 	if responseid != "" {

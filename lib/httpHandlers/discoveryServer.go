@@ -16,7 +16,7 @@ import (
 func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
-	if this.DebugLevel >= 2 {
+	if this.DebugLevel >= 3 {
 		log.Printf("Found Message on Discovery Server Handler from %s", r.RemoteAddr)
 	}
 
@@ -33,14 +33,14 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 
 	err = this.verifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.DebugLevel >= 3 {
+		if this.DebugLevel >= 2 {
 			log.Print(err)
 		}
 
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		w.Write(statusMessageData)
 		return
 	}
@@ -54,14 +54,14 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 	err = decoder.Decode(&requestMessageData)
 
 	if err != nil {
-		statusMessageData := CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
+		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
+		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
 		w.Write(statusMessageData)
 		return
 	}
@@ -70,7 +70,7 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 		log.Printf("Found TAXII Discovery Request Message from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
-	data := CreateDiscoveryResponse(requestMessageData.TaxiiMessage.Id)
+	data := createDiscoveryResponse(requestMessageData.TaxiiMessage.Id)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
 
@@ -80,7 +80,7 @@ func (this *HttpHandlersType) DiscoveryServerHandler(w http.ResponseWriter, r *h
 // Create a TAXII Discovery Response Message
 // --------------------------------------------------
 
-func CreateDiscoveryResponse(responseid string) []byte {
+func createDiscoveryResponse(responseid string) []byte {
 	tm := discovery.NewResponse()
 	tm.AddInResponseTo(responseid)
 

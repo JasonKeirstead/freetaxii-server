@@ -11,13 +11,12 @@ import (
 	"github.com/freetaxii/libtaxii/poll"
 	"log"
 	"net/http"
-	"strings"
 )
 
 func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
-	if this.DebugLevel >= 2 {
+	if this.DebugLevel >= 3 {
 		log.Printf("Found Message on Poll Server Handler from %s", r.RemoteAddr)
 	}
 
@@ -34,14 +33,14 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 
 	err = this.verifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.DebugLevel >= 3 {
+		if this.DebugLevel >= 2 {
 			log.Print(err)
 		}
 
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		w.Write(statusMessageData)
 		return
 	}
@@ -55,14 +54,14 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 	err = decoder.Decode(&requestMessageData)
 
 	if err != nil {
-		statusMessageData := CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
+		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
+		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
 		w.Write(statusMessageData)
 		return
 	}
@@ -75,12 +74,15 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 	// Check for valid collection
 	// --------------------------------------------------
 
-	if strings.ToLower(requestMessageData.TaxiiMessage.CollectionName) == "watch-list" {
-		data := CreatePollResponse(requestMessageData.TaxiiMessage.Id, "watch-list")
+	// TODO move to a database or configuration file
+	validColletions := getValidCollections()
+
+	if val, ok := validColletions[requestMessageData.TaxiiMessage.CollectionName]; ok {
+		data := createPollResponse(requestMessageData.TaxiiMessage.Id, val)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(data)
 	} else {
-		statusMessageData := CreateTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", "The requested collection does not exist")
+		statusMessageData := createTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", "The requested collection does not exist")
 		w.Write(statusMessageData)
 	}
 
@@ -90,7 +92,7 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 // Create a TAXII Discovery Response Message
 // --------------------------------------------------
 
-func CreatePollResponse(responseid, collectionName string) []byte {
+func createPollResponse(responseid, collectionName string) []byte {
 	tm := poll.NewResponse()
 	tm.AddInResponseTo(responseid)
 	tm.AddCollectionName(collectionName)
