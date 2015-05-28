@@ -70,30 +70,51 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 		log.Printf("Found TAXII Collection Request Message from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
-	data := CreateCollectionResponse(requestMessageData.TaxiiMessage.Id)
+	// Get a list of valid collections for this collection request
+	validCollections := getValidCollections()
+
+	data := createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
+
+}
+
+// --------------------------------------------------
+// Get list of valid collections
+// --------------------------------------------------
+
+// TODO Read in from a database the collections we offer for this authenticated
+// user and put them in a map
+
+// The key is the collection name and the value is the description
+func getValidCollections() map[string]string {
+	c := make(map[string]string)
+	c["ip-watch-list"] = "List of interesting IP addresses"
+	c["url-watch-list"] = "List of interesting URL addresses"
+	return c
 }
 
 // --------------------------------------------------
 // Create a TAXII Collection Response Message
 // --------------------------------------------------
 
-func CreateCollectionResponse(responseid string) []byte {
+func createCollectionResponse(inResponseToID string, validCollections map[string]string) []byte {
 	tm := collection.NewResponse()
-	tm.AddInResponseTo(responseid)
+	tm.AddInResponseTo(inResponseToID)
 
-	c1 := collection.CreateCollection()
-	c1.AddName("ip-watch-list")
-	c1.SetAvailable()
-	c1.AddDescription("Data feed of interesting IP addresses")
-	c1.AddVolume(1)
-	//c1.SetPushMethodToHttpJson()
-	c1.SetPollServiceToHttpJson("http://taxiitest.freetaxii.com/services/poll/")
-	//c1.SetSubscriptionServiceToHttpJson("http://taxiitest.freetaxii.com/services/collection-management/")
-	//c1.SetInboxServiceToHttpJson("http://taxiitest.freetaxii.com/services/inbox/")
+	for k, v := range validCollections {
+		c := collection.CreateCollection()
+		c.AddName(k)
+		c.SetAvailable()
+		c.AddDescription(v)
+		c.AddVolume(1)
+		//c.SetPushMethodToHttpJson()
+		c.SetPollServiceToHttpJson("http://taxiitest.freetaxii.com/services/poll/")
+		//c.SetSubscriptionServiceToHttpJson("http://taxiitest.freetaxii.com/services/collection-management/")
+		//c.SetInboxServiceToHttpJson("http://taxiitest.freetaxii.com/services/inbox/")
 
-	tm.AddCollection(c1)
+		tm.AddCollection(c)
+	}
 
 	data, err := json.Marshal(tm)
 	if err != nil {
