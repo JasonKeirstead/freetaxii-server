@@ -82,7 +82,8 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(data)
 	} else {
-		statusMessageData := createTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", "The requested collection does not exist")
+		errmsg := "The requested collection \"" + requestMessageData.TaxiiMessage.CollectionName + "\" does not exist"
+		statusMessageData := createTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", errmsg)
 		w.Write(statusMessageData)
 	}
 
@@ -96,6 +97,13 @@ func createPollResponse(responseid, collectionName string) []byte {
 	tm := poll.NewResponse()
 	tm.AddInResponseTo(responseid)
 	tm.AddCollectionName(collectionName)
+	tm.AddResultId("freetaxii-test-service-1")
+	tm.AddMessage("This is a test service for FreeTAXII")
+	content := poll.CreateContentBlock()
+	content.SetContentEncodingToXml()
+	indicators := createIndicatorsXML()
+	content.AddContent(indicators)
+	tm.AddContentBlock(content)
 
 	data, err := json.Marshal(tm)
 	if err != nil {
@@ -104,4 +112,83 @@ func createPollResponse(responseid, collectionName string) []byte {
 		log.Fatal("Unable to create Poll Response Message")
 	}
 	return data
+}
+
+func createIndicatorsXML() string {
+	var rawxmldata = `<stix:STIX_Package xsi:schemaLocation="http://cybox.mitre.org/common-2 http://cybox.mitre.org/XMLSchema/common/2.1/cybox_common.xsd  http://cybox.mitre.org/cybox-2 http://cybox.mitre.org/XMLSchema/core/2.1/cybox_core.xsd  http://cybox.mitre.org/default_vocabularies-2 http://cybox.mitre.org/XMLSchema/default_vocabularies/2.1/cybox_default_vocabularies.xsd  http://cybox.mitre.org/objects#URIObject-2 http://cybox.mitre.org/XMLSchema/objects/URI/2.1/URI_Object.xsd  http://stix.mitre.org/Indicator-2 http://stix.mitre.org/XMLSchema/indicator/2.2/indicator.xsd  http://stix.mitre.org/common-1 http://stix.mitre.org/XMLSchema/common/1.2/stix_common.xsd  http://stix.mitre.org/default_vocabularies-1 http://stix.mitre.org/XMLSchema/default_vocabularies/1.2.0/stix_default_vocabularies.xsd  http://stix.mitre.org/stix-1 http://stix.mitre.org/XMLSchema/core/1.2/stix_core.xsd" 
+	id="example:Package-8fab937e-b694-11e3-b71c-0800271e87d2" version="1.2">
+	<stix:Indicators>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">176.119.3.108</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">178.207.85.119</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">178.63.174.153</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">188.241.140.212</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">14.138.73.47</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">131.72.138.45</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">62.84.51.39</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">62.109.23.246</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">5.101.113.169</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	  <stix:Indicator id="example:Indicator-d81f86b9-975b-bc0b-775e-810c5ad1111" xsi:type="indicator:IndicatorType">
+	    <indicator:Title>Malicious IP Addresses</indicator:Title>
+	    <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.0">IP Watchlist</indicator:Type>
+	    <indicator:Observable>
+	    <cybox:Object><cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+	    <URIObj:Value condition="Equals">213.231.8.30</URIObj:Value>
+	  </cybox:Properties></cybox:Object></indicator:Observable></stix:Indicator>
+	</stix:Indicators></stix:STIX_Package>`
+
+	return rawxmldata
 }

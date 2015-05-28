@@ -34,7 +34,7 @@ type ConfigFileType struct {
 	}
 }
 
-var sVersion = "0.2"
+var sVersion = "0.2.1"
 var DebugLevel int = 0
 
 var sOptConfigFilename = getopt.StringLong("config", 'c', DEFAULT_CONFIG_FILENAME, "Configuration File", "string")
