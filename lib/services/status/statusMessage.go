@@ -4,7 +4,7 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package httpHandlers
+package status
 
 import (
 	"encoding/json"
@@ -12,11 +12,15 @@ import (
 	"log"
 )
 
+type StatusType struct {
+	DebugLevel int
+}
+
 // --------------------------------------------------
 // Create a TAXII Status Message
 // --------------------------------------------------
 
-func createTaxiiStatusMessage(responseid, msgType, msg string) []byte {
+func (this *StatusType) CreateTaxiiStatusMessage(responseid, msgType, msg string) []byte {
 	tm := status.New()
 	tm.AddType(msgType)
 	if responseid != "" {

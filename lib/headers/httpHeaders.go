@@ -4,7 +4,7 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package httpHandlers
+package headers
 
 import (
 	"fmt"
@@ -12,11 +12,15 @@ import (
 	"net/http"
 )
 
+type HttpHeaderType struct {
+	DebugLevel int
+}
+
 // --------------------------------------------------
 // Verify HTTP Headers
 // --------------------------------------------------
 
-func (this *HttpHandlersType) verifyHttpTaxiiHeaderValues(r *http.Request) error {
+func (this *HttpHeaderType) VerifyHttpTaxiiHeaderValues(r *http.Request) error {
 
 	// --------------------------------------------------
 	// Version of the TAXII specification they are using
@@ -58,7 +62,7 @@ func (this *HttpHandlersType) verifyHttpTaxiiHeaderValues(r *http.Request) error
 // Debug HTTP Headers
 // --------------------------------------------------
 
-func (this *HttpHandlersType) debugHttpRequest(r *http.Request) {
+func (this *HttpHeaderType) DebugHttpRequest(r *http.Request) {
 
 	fmt.Println("DEBUG: --------------- BEGIN HTTP DUMP ---------------")
 	fmt.Println("DEBUG: Method", r.Method)

@@ -4,17 +4,27 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package httpHandlers
+package poll
 
 import (
 	"encoding/json"
+	"github.com/freetaxii/freetaxii-server/lib/headers"
+	"github.com/freetaxii/freetaxii-server/lib/services/collection"
+	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/poll"
 	"log"
 	"net/http"
 )
 
-func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
+type PollType struct {
+	DebugLevel int
+}
+
+func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
+	var taxiiHeader headers.HttpHeaderType
+	var statusMsg status.StatusType
+	var taxiiCollections collection.CollectionType
 
 	if this.DebugLevel >= 3 {
 		log.Printf("Found Message on Poll Server Handler from %s", r.RemoteAddr)
@@ -23,7 +33,7 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
 	if this.DebugLevel >= 5 {
-		this.debugHttpRequest(r)
+		taxiiHeader.DebugHttpRequest(r)
 	}
 
 	// --------------------------------------------------
@@ -31,7 +41,7 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 	// --------------------------------------------------
 	// Send a Status Message on error
 
-	err = this.verifyHttpTaxiiHeaderValues(r)
+	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
 		if this.DebugLevel >= 2 {
 			log.Print(err)
@@ -40,7 +50,7 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		w.Write(statusMessageData)
 		return
 	}
@@ -54,20 +64,20 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 	err = decoder.Decode(&requestMessageData)
 
 	if err != nil {
-		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
 		w.Write(statusMessageData)
 		return
 	}
 
 	if this.DebugLevel >= 1 {
-		log.Printf("Found TAXII Poll Request Message from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
+		log.Printf("Poll Request from %s for %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.CollectionName, requestMessageData.TaxiiMessage.Id)
 	}
 
 	// --------------------------------------------------
@@ -75,15 +85,15 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 	// --------------------------------------------------
 
 	// TODO move to a database or configuration file
-	validColletions := getValidCollections()
+	currentlyValidCollections := taxiiCollections.GetValidCollections()
 
-	if val, ok := validColletions[requestMessageData.TaxiiMessage.CollectionName]; ok {
-		data := createPollResponse(requestMessageData.TaxiiMessage.Id, val)
+	if val, ok := currentlyValidCollections[requestMessageData.TaxiiMessage.CollectionName]; ok {
+		data := this.createPollResponse(requestMessageData.TaxiiMessage.Id, val)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(data)
 	} else {
 		errmsg := "The requested collection \"" + requestMessageData.TaxiiMessage.CollectionName + "\" does not exist"
-		statusMessageData := createTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", errmsg)
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", errmsg)
 		w.Write(statusMessageData)
 	}
 
@@ -93,7 +103,7 @@ func (this *HttpHandlersType) PollServerHandler(w http.ResponseWriter, r *http.R
 // Create a TAXII Discovery Response Message
 // --------------------------------------------------
 
-func createPollResponse(responseid, collectionName string) []byte {
+func (this *PollType) createPollResponse(responseid, collectionName string) []byte {
 	tm := poll.NewResponse()
 	tm.AddInResponseTo(responseid)
 	tm.AddCollectionName(collectionName)
@@ -101,7 +111,7 @@ func createPollResponse(responseid, collectionName string) []byte {
 	tm.AddMessage("This is a test service for FreeTAXII")
 	content := poll.CreateContentBlock()
 	content.SetContentEncodingToXml()
-	indicators := createIndicatorsXML()
+	indicators := this.createIndicatorsXML()
 	content.AddContent(indicators)
 	tm.AddContentBlock(content)
 
@@ -114,7 +124,7 @@ func createPollResponse(responseid, collectionName string) []byte {
 	return data
 }
 
-func createIndicatorsXML() string {
+func (this *PollType) createIndicatorsXML() string {
 	var rawxmldata = `<stix:STIX_Package xsi:schemaLocation="http://cybox.mitre.org/common-2 http://cybox.mitre.org/XMLSchema/common/2.1/cybox_common.xsd  http://cybox.mitre.org/cybox-2 http://cybox.mitre.org/XMLSchema/core/2.1/cybox_core.xsd  http://cybox.mitre.org/default_vocabularies-2 http://cybox.mitre.org/XMLSchema/default_vocabularies/2.1/cybox_default_vocabularies.xsd  http://cybox.mitre.org/objects#URIObject-2 http://cybox.mitre.org/XMLSchema/objects/URI/2.1/URI_Object.xsd  http://stix.mitre.org/Indicator-2 http://stix.mitre.org/XMLSchema/indicator/2.2/indicator.xsd  http://stix.mitre.org/common-1 http://stix.mitre.org/XMLSchema/common/1.2/stix_common.xsd  http://stix.mitre.org/default_vocabularies-1 http://stix.mitre.org/XMLSchema/default_vocabularies/1.2.0/stix_default_vocabularies.xsd  http://stix.mitre.org/stix-1 http://stix.mitre.org/XMLSchema/core/1.2/stix_core.xsd" 
 	id="example:Package-8fab937e-b694-11e3-b71c-0800271e87d2" version="1.2">
 	<stix:Indicators>

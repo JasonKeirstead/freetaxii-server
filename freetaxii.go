@@ -10,7 +10,9 @@ import (
 	"code.google.com/p/gcfg"
 	"code.google.com/p/getopt"
 	"fmt"
-	"github.com/freetaxii/freetaxii-server/lib/httpHandlers"
+	"github.com/freetaxii/freetaxii-server/lib/services/collection"
+	"github.com/freetaxii/freetaxii-server/lib/services/discovery"
+	"github.com/freetaxii/freetaxii-server/lib/services/poll"
 	"log"
 	"net/http"
 	"os"
@@ -107,31 +109,37 @@ func main() {
 	// --------------------------------------------------
 	// Make sure there is a directory path defined in the configuration file
 	// for each service we want to listen on.
-
-	var taxiiServer httpHandlers.HttpHandlersType
-	taxiiServer.DebugLevel = DebugLevel
 	serviceCounter := 0
 
+	var taxiiDiscoveryServer discovery.DiscoveryType
+	taxiiDiscoveryServer.DebugLevel = DebugLevel
+
 	if syscfg.Services.Discovery != "" {
-		log.Println("TAXII Discovery services defined at:", syscfg.Services.Discovery)
-		http.HandleFunc(syscfg.Services.Discovery, taxiiServer.DiscoveryServerHandler)
+		log.Println("Starting TAXII Discovery services at:", syscfg.Services.Discovery)
+		http.HandleFunc(syscfg.Services.Discovery, taxiiDiscoveryServer.DiscoveryServerHandler)
 		serviceCounter++
 	}
+
+	var taxiiCollectionServer collection.CollectionType
+	taxiiCollectionServer.DebugLevel = DebugLevel
 
 	if syscfg.Services.Collection != "" {
-		log.Println("TAXII Collection services defined at:", syscfg.Services.Collection)
-		http.HandleFunc(syscfg.Services.Collection, taxiiServer.CollectionServerHandler)
+		log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
+		http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
 		serviceCounter++
 	}
 
+	var taxiiPollServer poll.PollType
+	taxiiPollServer.DebugLevel = DebugLevel
+
 	if syscfg.Services.Poll != "" {
-		log.Println("TAXII Poll services defined at:", syscfg.Services.Poll)
-		http.HandleFunc(syscfg.Services.Poll, taxiiServer.PollServerHandler)
+		log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)
+		http.HandleFunc(syscfg.Services.Poll, taxiiPollServer.PollServerHandler)
 		serviceCounter++
 	}
 
 	if serviceCounter == 0 {
-		log.Fatalln("No TAXII services are defined")
+		log.Fatalln("No TAXII services defined")
 	}
 
 	// --------------------------------------------------

@@ -4,17 +4,25 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package httpHandlers
+package collection
 
 import (
 	"encoding/json"
+	"github.com/freetaxii/freetaxii-server/lib/headers"
+	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/collection"
 	"log"
 	"net/http"
 )
 
-func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {
+type CollectionType struct {
+	DebugLevel int
+}
+
+func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
+	var taxiiHeader headers.HttpHeaderType
+	var statusMsg status.StatusType
 
 	if this.DebugLevel >= 3 {
 		log.Printf("Found Message on Collection Server Handler from %s", r.RemoteAddr)
@@ -23,7 +31,7 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
 	if this.DebugLevel >= 5 {
-		this.debugHttpRequest(r)
+		taxiiHeader.DebugHttpRequest(r)
 	}
 
 	// --------------------------------------------------
@@ -31,7 +39,7 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 	// --------------------------------------------------
 	// Send a Status Message on error
 
-	err = this.verifyHttpTaxiiHeaderValues(r)
+	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
 		if this.DebugLevel >= 2 {
 			log.Print(err)
@@ -40,7 +48,7 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		w.Write(statusMessageData)
 		return
 	}
@@ -54,51 +62,36 @@ func (this *HttpHandlersType) CollectionServerHandler(w http.ResponseWriter, r *
 	err = decoder.Decode(&requestMessageData)
 
 	if err != nil {
-		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Collection Request")
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Collection Request")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := createTaxiiStatusMessage("", "BAD_MESSAGE", "Collection Request message did not include an ID")
+		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Collection Request message did not include an ID")
 		w.Write(statusMessageData)
 		return
 	}
 
 	if this.DebugLevel >= 1 {
-		log.Printf("Found TAXII Collection Request Message from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
+		log.Printf("Collection Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
 	// Get a list of valid collections for this collection request
-	validCollections := getValidCollections()
+	validCollections := this.GetValidCollections()
 
-	data := createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
+	data := this.createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
 
 }
 
 // --------------------------------------------------
-// Get list of valid collections
-// --------------------------------------------------
-
-// TODO Read in from a database the collections we offer for this authenticated
-// user and put them in a map
-
-// The key is the collection name and the value is the description
-func getValidCollections() map[string]string {
-	c := make(map[string]string)
-	c["ip-watch-list"] = "List of interesting IP addresses"
-	c["url-watch-list"] = "List of interesting URL addresses"
-	return c
-}
-
-// --------------------------------------------------
 // Create a TAXII Collection Response Message
 // --------------------------------------------------
 
-func createCollectionResponse(inResponseToID string, validCollections map[string]string) []byte {
+func (this *CollectionType) createCollectionResponse(inResponseToID string, validCollections map[string]string) []byte {
 	tm := collection.NewResponse()
 	tm.AddInResponseTo(inResponseToID)
 
