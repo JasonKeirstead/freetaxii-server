@@ -1,6 +1,7 @@
 # FreeTAXII/freetaxii-server #
 
-The FreeTAXII FreeTAXII-Server is a TAXII Server written in Go (golang)
+The FreeTAXII-Server is a TAXII Server written in Go (golang) and currently 
+supports JSON based TAXII messages
 
 
 ## Installation ##
