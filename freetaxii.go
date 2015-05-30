@@ -7,8 +7,8 @@
 package main
 
 import (
-	"code.google.com/p/gcfg"
 	"code.google.com/p/getopt"
+	"encoding/json"
 	"fmt"
 	"github.com/freetaxii/freetaxii-server/lib/services/collection"
 	"github.com/freetaxii/freetaxii-server/lib/services/discovery"
@@ -25,9 +25,10 @@ const (
 
 type ConfigFileType struct {
 	System struct {
-		Debug   int
-		LogFile string
-		Listen  string
+		DebugLevel int
+		LogFile    string
+		Listen     string
+		DbFile     string
 	}
 	Services struct {
 		Discovery  string
@@ -63,18 +64,25 @@ func main() {
 	// --------------------------------------------------
 
 	sysConfigFilename := *sOptConfigFilename
-	var syscfg ConfigFileType
-	err := gcfg.ReadFileInto(&syscfg, sysConfigFilename)
+	sysConfigFile, err := os.Open(sysConfigFilename)
 	if err != nil {
 		log.Fatalf("error opening configuration file: %v", err)
 	}
 
 	// --------------------------------------------------
+	// Decode JSON configuration file
+	// --------------------------------------------------
+	// Use decoder instead of unmarshal so we can handle stream data
+	decoder := json.NewDecoder(sysConfigFile)
+	var syscfg ConfigFileType
+	err = decoder.Decode(&syscfg)
+
+	// --------------------------------------------------
 	// Setup Debug Level
 	// --------------------------------------------------
 
-	if syscfg.System.Debug >= 0 && syscfg.System.Debug <= 5 {
-		DebugLevel = syscfg.System.Debug
+	if syscfg.System.DebugLevel >= 0 && syscfg.System.DebugLevel <= 5 {
+		DebugLevel = syscfg.System.DebugLevel
 	}
 
 	// --------------------------------------------------
