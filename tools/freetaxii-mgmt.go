@@ -162,9 +162,10 @@ func listCollections(db *sql.DB) {
 	fmt.Println("\nCurrent Collections")
 	fmt.Println("===================")
 	for rows.Next() {
+		var id int
 		var collection string
 		var description string
-		err = rows.Scan(&collection, &description)
+		err = rows.Scan(&id, &collection, &description)
 		if err != nil {
 			log.Printf("Mgmt - error reading from database, %v", err)
 		}
