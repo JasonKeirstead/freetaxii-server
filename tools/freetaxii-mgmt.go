@@ -18,14 +18,16 @@ import (
 
 const (
 	DEFAULT_CONFIG_FILENAME = "../etc/freetaxii.conf"
-	DEFAULT_LOG_FILENAME    = "../logs/freetaxii.log"
 )
 
 type ConfigFileType struct {
 	System struct {
-		DebugLevel int
-		LogFile    string
-		DbFile     string
+		DebugLevel      int
+		Prefix          string
+		LogFile         string
+		DbFile          string
+		LogFileFullPath string
+		DbFileFullPath  string
 	}
 }
 
@@ -33,8 +35,8 @@ var sVersion = "0.2.1"
 var DebugLevel int = 0
 
 var sOptConfigFilename = getopt.StringLong("config", 'c', DEFAULT_CONFIG_FILENAME, "Configuration File", "string")
-var sOptLogFilename = getopt.StringLong("logfile", 'f', DEFAULT_LOG_FILENAME, "Server Log File", "string")
 var bOptListCollection = getopt.BoolLong("list-collections", 0, "List Collections")
+var bOptAddCollection = getopt.BoolLong("add-collection", 0, "Add Collections")
 var bOptHelp = getopt.BoolLong("help", 0, "Help")
 var bOptVer = getopt.BoolLong("version", 0, "Version")
 
@@ -57,7 +59,7 @@ func main() {
 	// --------------------------------------------------
 
 	sysConfigFilename := *sOptConfigFilename
-	sysConfigFile, err := os.Open(sysConfigFilename)
+	sysConfigFileData, err := os.Open(sysConfigFilename)
 	if err != nil {
 		log.Fatalf("error opening configuration file: %v", err)
 	}
@@ -66,9 +68,17 @@ func main() {
 	// Decode JSON configuration file
 	// --------------------------------------------------
 	// Use decoder instead of unmarshal so we can handle stream data
-	decoder := json.NewDecoder(sysConfigFile)
+	decoder := json.NewDecoder(sysConfigFileData)
 	var syscfg ConfigFileType
 	err = decoder.Decode(&syscfg)
+
+	if err != nil {
+		log.Fatalf("error parsing configuration file %v", err)
+	}
+
+	// Lets assign the full paths to a few variables so we can use them later
+	syscfg.System.DbFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.DbFile
+	syscfg.System.LogFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.LogFile
 
 	// --------------------------------------------------
 	// Setup Debug Level
@@ -81,7 +91,7 @@ func main() {
 	// --------------------------------------------------
 	// Setup Logging File
 	// --------------------------------------------------
-	// The default location for the logs is ./etc/freetaxii.log
+	// The default location for the logs is ./log/freetaxii.log
 	// If a log file location is passed in via the command line flags, then lets
 	// use it. Otherwise, lets look in the configuration file.  If nothing is
 	// there, then we will use the default.
@@ -91,12 +101,11 @@ func main() {
 	// To do this, we need to split the filename from the directory, we will want to only
 	// take the last bit in case there is multiple directories /etc/foo/bar/stuff.log
 
-	sysLogFilename := *sOptLogFilename
-	// TODO this is not working right as the path in the config file does not match up to
-	// the root of the server like it should.  Need to fix that.
-	// if sysLogFilename == DEFAULT_LOG_FILENAME && syscfg.System.LogFile != "" {
-	// 	sysLogFilename = syscfg.System.LogFile
-	// }
+	sysLogFilename := syscfg.System.LogFileFullPath
+
+	if DebugLevel >= 3 {
+		log.Println("Mgmt - Using the following log file", sysLogFilename)
+	}
 
 	logFile, err := os.OpenFile(sysLogFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -111,7 +120,10 @@ func main() {
 	// Check for what to do
 	// --------------------------------------------------
 	if *bOptListCollection {
-		listCollections()
+		listCollections(&syscfg)
+	}
+	if *bOptAddCollection {
+		addCollection(&syscfg)
 	}
 
 }
@@ -120,9 +132,17 @@ func main() {
 // List currently defined collections
 // --------------------------------------------------
 
-func listCollections() {
-	db, err := sql.Open("sqlite3", "../db/freetaxii.db")
-	checkErr(err)
+func listCollections(syscfg *ConfigFileType) {
+	filename := syscfg.System.DbFileFullPath
+
+	if DebugLevel >= 3 {
+		log.Println("Mgmt - Using the following database file", filename)
+	}
+
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		log.Fatalf("Unable to open file %s due to error %v", filename, err)
+	}
 	defer db.Close()
 
 	rows, err := db.Query("SELECT * FROM Collections")
@@ -136,8 +156,32 @@ func listCollections() {
 		var description string
 		err = rows.Scan(&collection, &description)
 		checkErr(err)
-		fmt.Printf("\t%s \t %s\n", collection, description)
+		fmt.Printf("\t%-15s \t %s\n", collection, description)
 	}
+}
+
+// --------------------------------------------------
+// Add collection
+// --------------------------------------------------
+
+func addCollection(syscfg *ConfigFileType) {
+	filename := syscfg.System.DbFileFullPath
+
+	if DebugLevel >= 3 {
+		log.Println("Mgmt - Using the following database file", filename)
+	}
+
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		log.Fatalf("Unable to open file %s due to error %v", filename, err)
+	}
+	defer db.Close()
+
+	result, err := db.Exec("Insert into Collections (collection, description) values (?, ?)", "test1", "some collection 1")
+	log.Println("Mgmt - Add collection results", result)
+	checkErr(err)
+
+	// prompt user for input, collection name and descrption
 }
 
 func checkErr(err error) {
