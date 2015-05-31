@@ -7,6 +7,7 @@
 package main
 
 import (
+	"bufio"
 	"code.google.com/p/getopt"
 	"database/sql"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
+	"strings"
 )
 
 const (
@@ -37,6 +39,7 @@ var DebugLevel int = 0
 var sOptConfigFilename = getopt.StringLong("config", 'c', DEFAULT_CONFIG_FILENAME, "Configuration File", "string")
 var bOptListCollection = getopt.BoolLong("list-collections", 0, "List Collections")
 var bOptAddCollection = getopt.BoolLong("add-collection", 0, "Add Collections")
+var bOptDelCollection = getopt.BoolLong("del-collection", 0, "Delete Collections")
 var bOptHelp = getopt.BoolLong("help", 0, "Help")
 var bOptVer = getopt.BoolLong("version", 0, "Version")
 
@@ -117,13 +120,30 @@ func main() {
 	log.Println("Starting FreeTAXII Management")
 
 	// --------------------------------------------------
+	// Open connection to database
+	// --------------------------------------------------
+	filename := syscfg.System.DbFileFullPath
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		log.Fatalf("Unable to open file %s due to error %v", filename, err)
+	}
+	defer db.Close()
+
+	if DebugLevel >= 3 {
+		log.Println("Mgmt - Using the following database file", filename)
+	}
+
+	// --------------------------------------------------
 	// Check for what to do
 	// --------------------------------------------------
 	if *bOptListCollection {
-		listCollections(&syscfg)
+		listCollections(db)
 	}
 	if *bOptAddCollection {
-		addCollection(&syscfg)
+		addCollection(db)
+	}
+	if *bOptDelCollection {
+		delCollection(db)
 	}
 
 }
@@ -132,19 +152,7 @@ func main() {
 // List currently defined collections
 // --------------------------------------------------
 
-func listCollections(syscfg *ConfigFileType) {
-	filename := syscfg.System.DbFileFullPath
-
-	if DebugLevel >= 3 {
-		log.Println("Mgmt - Using the following database file", filename)
-	}
-
-	db, err := sql.Open("sqlite3", filename)
-	if err != nil {
-		log.Fatalf("Unable to open file %s due to error %v", filename, err)
-	}
-	defer db.Close()
-
+func listCollections(db *sql.DB) {
 	rows, err := db.Query("SELECT * FROM Collections")
 	checkErr(err)
 	defer rows.Close()
@@ -156,7 +164,7 @@ func listCollections(syscfg *ConfigFileType) {
 		var description string
 		err = rows.Scan(&collection, &description)
 		checkErr(err)
-		fmt.Printf("\t%-15s \t %s\n", collection, description)
+		fmt.Printf("\t%-10s \t %s\n", collection, description)
 	}
 }
 
@@ -164,24 +172,43 @@ func listCollections(syscfg *ConfigFileType) {
 // Add collection
 // --------------------------------------------------
 
-func addCollection(syscfg *ConfigFileType) {
-	filename := syscfg.System.DbFileFullPath
+func addCollection(db *sql.DB) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Collection Name: ")
+	collectionName, _ := reader.ReadString('\n')
+	collectionName = strings.TrimSpace(collectionName)
 
-	if DebugLevel >= 3 {
-		log.Println("Mgmt - Using the following database file", filename)
-	}
+	fmt.Print("Collection Description: ")
+	collectionDescription, _ := reader.ReadString('\n')
+	collectionDescription = strings.TrimSpace(collectionDescription)
 
-	db, err := sql.Open("sqlite3", filename)
+	_, err := db.Exec("INSERT INTO Collections (collection, description) values (?, ?)", collectionName, collectionDescription)
 	if err != nil {
-		log.Fatalf("Unable to open file %s due to error %v", filename, err)
+		log.Printf("Mgmt - Unable to insert record due to error %v", err)
 	}
-	defer db.Close()
 
-	result, err := db.Exec("Insert into Collections (collection, description) values (?, ?)", "test1", "some collection 1")
-	log.Println("Mgmt - Add collection results", result)
-	checkErr(err)
+	if DebugLevel >= 1 {
+		log.Printf("Mgmt - Inserted %s in to table Collections", collectionName)
+	}
+}
 
-	// prompt user for input, collection name and descrption
+// --------------------------------------------------
+// Delete collection
+// --------------------------------------------------
+func delCollection(db *sql.DB) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Collection Name: ")
+	collectionName, _ := reader.ReadString('\n')
+	collectionName = strings.TrimSpace(collectionName)
+
+	_, err := db.Exec("DELETE FROM Collections where (collection=?)", collectionName)
+	if err != nil {
+		log.Printf("Mgmt - Unable to delete record due to error %v", err)
+	}
+
+	if DebugLevel >= 1 {
+		log.Printf("Mgmt - Deleted %s from table Collections", collectionName)
+	}
 }
 
 func checkErr(err error) {
