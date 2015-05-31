@@ -154,7 +154,9 @@ func main() {
 
 func listCollections(db *sql.DB) {
 	rows, err := db.Query("SELECT * FROM Collections")
-	checkErr(err)
+	if err != nil {
+		log.Printf("Mgmt - error running query, %v", err)
+	}
 	defer rows.Close()
 
 	fmt.Println("\nCurrent Collections")
@@ -163,7 +165,9 @@ func listCollections(db *sql.DB) {
 		var collection string
 		var description string
 		err = rows.Scan(&collection, &description)
-		checkErr(err)
+		if err != nil {
+			log.Printf("Mgmt - error reading from database, %v", err)
+		}
 		fmt.Printf("\t%-10s \t %s\n", collection, description)
 	}
 }
@@ -173,14 +177,11 @@ func listCollections(db *sql.DB) {
 // --------------------------------------------------
 
 func addCollection(db *sql.DB) {
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Collection Name: ")
-	collectionName, _ := reader.ReadString('\n')
-	collectionName = strings.TrimSpace(collectionName)
+	collectionName, _ := getInput()
 
 	fmt.Print("Collection Description: ")
-	collectionDescription, _ := reader.ReadString('\n')
-	collectionDescription = strings.TrimSpace(collectionDescription)
+	collectionDescription, _ := getInput()
 
 	_, err := db.Exec("INSERT INTO Collections (collection, description) values (?, ?)", collectionName, collectionDescription)
 	if err != nil {
@@ -196,25 +197,30 @@ func addCollection(db *sql.DB) {
 // Delete collection
 // --------------------------------------------------
 func delCollection(db *sql.DB) {
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Collection Name: ")
-	collectionName, _ := reader.ReadString('\n')
-	collectionName = strings.TrimSpace(collectionName)
+	collectionName, _ := getInput()
 
 	_, err := db.Exec("DELETE FROM Collections where (collection=?)", collectionName)
 	if err != nil {
 		log.Printf("Mgmt - Unable to delete record due to error %v", err)
 	}
 
+	// TODO this does not work right if the value is not in the database. It says it was deleted
+	// when it was not, need to catch that error
 	if DebugLevel >= 1 {
 		log.Printf("Mgmt - Deleted %s from table Collections", collectionName)
 	}
 }
 
-func checkErr(err error) {
-	if err != nil {
-		panic(err)
-	}
+// --------------------------------------------------
+// Get Input
+// --------------------------------------------------
+
+func getInput() (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	return input, err
 }
 
 // --------------------------------------------------
