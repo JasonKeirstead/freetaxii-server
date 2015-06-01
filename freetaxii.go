@@ -25,10 +25,13 @@ const (
 
 type ConfigFileType struct {
 	System struct {
-		DebugLevel int
-		LogFile    string
-		Listen     string
-		DbFile     string
+		DebugLevel      int
+		Listen          string
+		Prefix          string
+		LogFile         string
+		DbFile          string
+		LogFileFullPath string
+		DbFileFullPath  string
 	}
 	Services struct {
 		Discovery  string
@@ -77,6 +80,14 @@ func main() {
 	var syscfg ConfigFileType
 	err = decoder.Decode(&syscfg)
 
+	if err != nil {
+		log.Fatalf("error parsing configuration file %v", err)
+	}
+
+	// Lets assign the full paths to a few variables so we can use them later
+	syscfg.System.DbFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.DbFile
+	syscfg.System.LogFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.LogFile
+
 	// --------------------------------------------------
 	// Setup Debug Level
 	// --------------------------------------------------
@@ -121,6 +132,9 @@ func main() {
 
 	var taxiiDiscoveryServer discovery.DiscoveryType
 	taxiiDiscoveryServer.DebugLevel = DebugLevel
+	taxiiDiscoveryServer.ReloadServices = true
+	fmt.Println("DEBUG: Setting Reload Services to true")
+	taxiiDiscoveryServer.DbFileFullPath = syscfg.System.DbFileFullPath
 
 	if syscfg.Services.Discovery != "" {
 		log.Println("Starting TAXII Discovery services at:", syscfg.Services.Discovery)
@@ -130,6 +144,7 @@ func main() {
 
 	var taxiiCollectionServer collection.CollectionType
 	taxiiCollectionServer.DebugLevel = DebugLevel
+	taxiiCollectionServer.DbFileFullPath = syscfg.System.DbFileFullPath
 
 	if syscfg.Services.Collection != "" {
 		log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
@@ -139,6 +154,7 @@ func main() {
 
 	var taxiiPollServer poll.PollType
 	taxiiPollServer.DebugLevel = DebugLevel
+	taxiiPollServer.DbFileFullPath = syscfg.System.DbFileFullPath
 
 	if syscfg.Services.Poll != "" {
 		log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)

@@ -16,7 +16,8 @@ import (
 )
 
 type CollectionType struct {
-	DebugLevel int
+	DebugLevel     int
+	DbFileFullPath string
 }
 
 func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {

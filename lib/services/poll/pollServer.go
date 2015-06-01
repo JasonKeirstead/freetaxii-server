@@ -17,7 +17,8 @@ import (
 )
 
 type PollType struct {
-	DebugLevel int
+	DebugLevel     int
+	DbFileFullPath string
 }
 
 func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) {

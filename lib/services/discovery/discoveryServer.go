@@ -7,16 +7,28 @@
 package discovery
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/discovery"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 )
 
 type DiscoveryType struct {
-	DebugLevel int
+	DebugLevel     int
+	DbFileFullPath string
+	ReloadServices bool
+	Services       []DiscoveryServiceType
+}
+
+type DiscoveryServiceType struct {
+	ServiceType string
+	Available   bool
+	Address     string
 }
 
 func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,10 +90,15 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 		log.Printf("Discovery Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
+	if this.ReloadServices == true {
+		this.loadServices()
+		this.ReloadServices = false
+		fmt.Println("DEBUG: Setting Reload Services to false")
+	}
+
 	data := this.createDiscoveryResponse(requestMessageData.TaxiiMessage.Id)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
-
 }
 
 // --------------------------------------------------
@@ -114,4 +131,55 @@ func (this *DiscoveryType) createDiscoveryResponse(responseid string) []byte {
 		log.Fatal("Unable to create Discovery Response Message")
 	}
 	return data
+}
+
+// --------------------------------------------------
+// Load Services from Database
+// --------------------------------------------------
+func (this *DiscoveryType) loadServices() {
+
+	// Clear out existing data so when we reload we do not have a contaminated array
+	this.Services = nil
+
+	// Open connection to database
+	filename := this.DbFileFullPath
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		log.Fatalf("Unable to open file %s due to error %v", filename, err)
+	}
+	defer db.Close()
+
+	// Read in services for the discovery server.
+	sqlstmt := `SELECT type, available, address 
+				FROM Services AS s 
+				INNER JOIN ServiceType AS t 
+				ON s.typeid = t.id`
+	rows, err := db.Query(sqlstmt)
+	if err != nil {
+		log.Printf("error running query, %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var servicetype string
+		var available int
+		var address string
+		err = rows.Scan(&servicetype, &available, &address)
+
+		if err != nil {
+			log.Printf("error reading from database, %v", err)
+		}
+
+		var services DiscoveryServiceType
+		services.ServiceType = servicetype
+		if available == 1 {
+			services.Available = true
+		} else {
+			services.Available = false
+		}
+		services.Address = address
+
+		// Add services to object
+		this.Services = append(this.Services, services)
+	}
 }
