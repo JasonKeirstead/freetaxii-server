@@ -59,7 +59,7 @@ func main() {
 
 	// Only enable logging to a file if it is turned on in the configuration file
 	if syscfg.Logging.Enabled == true {
-		logFile, err := os.OpenFile(syscfg.Logging.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		logFile, err := os.OpenFile(syscfg.Logging.LogFileFullPath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
 			log.Fatalf("error opening file: %v", err)
 		}

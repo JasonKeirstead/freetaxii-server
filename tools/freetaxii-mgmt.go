@@ -10,8 +10,8 @@ import (
 	"bufio"
 	"code.google.com/p/getopt"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"github.com/freetaxii/freetaxii-server/lib/config"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"os"
@@ -21,21 +21,6 @@ import (
 const (
 	DEFAULT_CONFIG_FILENAME = "../etc/freetaxii.conf"
 )
-
-type ServerConfigType struct {
-	System struct {
-		Listen         string
-		Prefix         string
-		DbFile         string
-		DbFileFullPath string
-	}
-	Logging struct {
-		Enabled         bool
-		LogFile         string
-		DebugLevel      int
-		LogFileFullPath string
-	}
-}
 
 var sVersion = "0.2.1"
 var DebugLevel int = 0
@@ -65,60 +50,22 @@ func main() {
 	// Load Configuration File
 	// --------------------------------------------------
 
-	sysConfigFilename := *sOptConfigFilename
-	sysConfigFileData, err := os.Open(sysConfigFilename)
-	if err != nil {
-		log.Fatalf("error opening configuration file: %v", err)
-	}
-
-	// --------------------------------------------------
-	// Decode JSON configuration file
-	// --------------------------------------------------
-	// Use decoder instead of unmarshal so we can handle stream data
-	decoder := json.NewDecoder(sysConfigFileData)
-	var syscfg SystemConfigType
-	err = decoder.Decode(&syscfg)
-
-	if err != nil {
-		log.Fatalf("error parsing configuration file %v", err)
-	}
-
-	// Lets assign the full paths to a few variables so we can use them later
-	syscfg.System.DbFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.DbFile
-	syscfg.Logging.LogFileFullPath = syscfg.System.Prefix + "/" + syscfg.Logging.LogFile
-
-	// --------------------------------------------------
-	// Setup Debug Level
-	// --------------------------------------------------
-
-	if syscfg.Logging.DebugLevel >= 0 && syscfg.Logging.DebugLevel <= 5 {
-		DebugLevel = syscfg.Logging.DebugLevel
-	}
+	var syscfg config.ServerConfigType
+	syscfg.LoadConfig(*sOptConfigFilename)
 
 	// --------------------------------------------------
 	// Setup Logging File
 	// --------------------------------------------------
-	// The default location for the logs is ./log/freetaxii.log
-	// If a log file location is passed in via the command line flags, then lets
-	// use it. Otherwise, lets look in the configuration file.  If nothing is
-	// there, then we will use the default.
-
 	// TODO
 	// Need to make the directory if it does not already exist
 	// To do this, we need to split the filename from the directory, we will want to only
 	// take the last bit in case there is multiple directories /etc/foo/bar/stuff.log
 
-	sysLogFilename := syscfg.Logging.LogFileFullPath
-
-	if DebugLevel >= 3 {
-		log.Println("M: - Using the following log file", sysLogFilename)
-	}
-
 	// Only enable logging to a file if it is turned on in the configuration file
 	if syscfg.Logging.Enabled == true {
-		logFile, err := os.OpenFile(sysLogFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		logFile, err := os.OpenFile(syscfg.Logging.LogFileFullPath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err != nil {
-			log.Fatalf("M: error opening file: %v", err)
+			log.Fatalf("error opening file: %v", err)
 		}
 		defer logFile.Close()
 
@@ -138,7 +85,7 @@ func main() {
 	defer db.Close()
 
 	if DebugLevel >= 3 {
-		log.Println("M: Using the following database file", filename)
+		log.Println("DEBUG-3: Using the following database file", filename)
 	}
 
 	// --------------------------------------------------
@@ -198,7 +145,7 @@ func addCollection(db *sql.DB) {
 	}
 
 	if DebugLevel >= 1 {
-		log.Printf("M: Inserted %s in to table Collections", collectionName)
+		log.Printf("DEBUG-1M: Inserted %s in to table Collections", collectionName)
 	}
 }
 
@@ -217,7 +164,7 @@ func delCollection(db *sql.DB) {
 	// TODO this does not work right if the value is not in the database. It says it was deleted
 	// when it was not, need to catch that error
 	if DebugLevel >= 1 {
-		log.Printf("M: Deleted %s from table Collections", collectionName)
+		log.Printf("DEBUG-1M: Deleted %s from table Collections", collectionName)
 	}
 }
 
