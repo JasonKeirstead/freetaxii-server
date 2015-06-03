@@ -8,6 +8,7 @@ package poll
 
 import (
 	"encoding/json"
+	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/collection"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
@@ -17,8 +18,7 @@ import (
 )
 
 type PollType struct {
-	LogLevel       int
-	DbFileFullPath string
+	SysConfig *config.ServerConfigType
 }
 
 func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
@@ -26,14 +26,15 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	var taxiiHeader headers.HttpHeaderType
 	var statusMsg status.StatusType
 	var taxiiCollections collection.CollectionType
+	taxiiCollections.SysConfig = this.SysConfig
 
-	if this.LogLevel >= 3 {
-		log.Printf("Found Message on Poll Server Handler from %s", r.RemoteAddr)
+	if this.SysConfig.Logging.LogLevel >= 3 {
+		log.Printf("DEBUG-3: Found Message on Poll Server Handler from %s", r.RemoteAddr)
 	}
 
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
-	if this.LogLevel >= 5 {
+	if this.SysConfig.Logging.LogLevel >= 5 {
 		taxiiHeader.DebugHttpRequest(r)
 	}
 
@@ -44,7 +45,7 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 
 	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.LogLevel >= 3 {
+		if this.SysConfig.Logging.LogLevel >= 3 {
 			log.Print(err)
 		}
 
@@ -52,6 +53,9 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE", err.Error())
+		}
 		w.Write(statusMessageData)
 		return
 	}
@@ -66,6 +70,9 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 
 	if err != nil {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE, can not decode Poll Request")
+		}
 		w.Write(statusMessageData)
 		return
 	}
@@ -73,12 +80,15 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE, Poll Request message did not include an ID")
+		}
 		w.Write(statusMessageData)
 		return
 	}
 
-	if this.LogLevel >= 1 {
-		log.Printf("Poll Request from %s for %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.CollectionName, requestMessageData.TaxiiMessage.Id)
+	if this.SysConfig.Logging.LogLevel >= 1 {
+		log.Printf("DEBUG-1: Poll Request from %s for %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.CollectionName, requestMessageData.TaxiiMessage.Id)
 	}
 
 	// --------------------------------------------------
@@ -91,10 +101,16 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	if val, ok := currentlyValidCollections[requestMessageData.TaxiiMessage.CollectionName]; ok {
 		data := this.createPollResponse(requestMessageData.TaxiiMessage.Id, val)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: Sending Poll Response to", r.RemoteAddr)
+		}
 		w.Write(data)
 	} else {
 		errmsg := "The requested collection \"" + requestMessageData.TaxiiMessage.CollectionName + "\" does not exist"
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", errmsg)
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: DESTINATION_COLLECTION_ERROR, Poll Request asked for a collection that does not exist")
+		}
 		w.Write(statusMessageData)
 	}
 

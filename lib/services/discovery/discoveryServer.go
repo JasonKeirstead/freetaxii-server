@@ -64,6 +64,9 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE", err.Error())
+		}
 		w.Write(statusMessageData)
 		return
 	}

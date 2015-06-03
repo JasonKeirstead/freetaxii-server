@@ -52,6 +52,9 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE", err.Error())
+		}
 		w.Write(statusMessageData)
 		return
 	}
@@ -88,7 +91,7 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 	}
 
 	// Get a list of valid collections for this collection request
-	validCollections := this.getValidCollections()
+	validCollections := this.GetValidCollections()
 
 	data := this.createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -134,7 +137,7 @@ func (this *CollectionType) createCollectionResponse(inResponseToID string, vali
 // Get list of valid collections
 // --------------------------------------------------
 
-func (this *CollectionType) getValidCollections() map[string]string {
+func (this *CollectionType) GetValidCollections() map[string]string {
 
 	// TODO Read in from a database the collections we offer for this authenticated
 	// user and put them in a map

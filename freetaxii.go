@@ -12,7 +12,7 @@ import (
 	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/services/collection"
 	"github.com/freetaxii/freetaxii-server/lib/services/discovery"
-	// "github.com/freetaxii/freetaxii-server/lib/services/poll"
+	"github.com/freetaxii/freetaxii-server/lib/services/poll"
 	"log"
 	"net/http"
 	"os"
@@ -101,15 +101,14 @@ func main() {
 		serviceCounter++
 	}
 
-	// var taxiiPollServer poll.PollType
-	// taxiiPollServer.LogLevel = LogLevel
-	// taxiiPollServer.DbFileFullPath = syscfg.System.DbFileFullPath
+	var taxiiPollServer poll.PollType
+	taxiiPollServer.SysConfig = &syscfg
 
-	// if syscfg.Services.Poll != "" {
-	// 	log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)
-	// 	http.HandleFunc(syscfg.Services.Poll, taxiiPollServer.PollServerHandler)
-	// 	serviceCounter++
-	// }
+	if syscfg.Services.Poll != "" {
+		log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)
+		http.HandleFunc(syscfg.Services.Poll, taxiiPollServer.PollServerHandler)
+		serviceCounter++
+	}
 
 	if serviceCounter == 0 {
 		log.Fatalln("No TAXII services defined")
