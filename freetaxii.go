@@ -10,7 +10,7 @@ import (
 	"code.google.com/p/getopt"
 	"fmt"
 	"github.com/freetaxii/freetaxii-server/lib/config"
-	// "github.com/freetaxii/freetaxii-server/lib/services/collection"
+	"github.com/freetaxii/freetaxii-server/lib/services/collection"
 	"github.com/freetaxii/freetaxii-server/lib/services/discovery"
 	// "github.com/freetaxii/freetaxii-server/lib/services/poll"
 	"log"
@@ -92,15 +92,14 @@ func main() {
 		serviceCounter++
 	}
 
-	// var taxiiCollectionServer collection.CollectionType
-	// taxiiCollectionServer.LogLevel = LogLevel
-	// taxiiCollectionServer.DbFileFullPath = syscfg.System.DbFileFullPath
+	var taxiiCollectionServer collection.CollectionType
+	taxiiCollectionServer.SysConfig = &syscfg
 
-	// if syscfg.Services.Collection != "" {
-	// 	log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
-	// 	http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
-	// 	serviceCounter++
-	// }
+	if syscfg.Services.Collection != "" {
+		log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
+		http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
+		serviceCounter++
+	}
 
 	// var taxiiPollServer poll.PollType
 	// taxiiPollServer.LogLevel = LogLevel

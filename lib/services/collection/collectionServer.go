@@ -7,17 +7,19 @@
 package collection
 
 import (
+	"database/sql"
 	"encoding/json"
+	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/collection"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 )
 
 type CollectionType struct {
-	LogLevel       int
-	DbFileFullPath string
+	SysConfig *config.ServerConfigType
 }
 
 func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {
@@ -25,13 +27,13 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 	var taxiiHeader headers.HttpHeaderType
 	var statusMsg status.StatusType
 
-	if this.LogLevel >= 3 {
-		log.Printf("Found Message on Collection Server Handler from %s", r.RemoteAddr)
+	if this.SysConfig.Logging.LogLevel >= 3 {
+		log.Printf("DEBUG-3: Found Message on Collection Server Handler from %s", r.RemoteAddr)
 	}
 
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
-	if this.LogLevel >= 5 {
+	if this.SysConfig.Logging.LogLevel >= 5 {
 		taxiiHeader.DebugHttpRequest(r)
 	}
 
@@ -42,7 +44,7 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 
 	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.LogLevel >= 3 {
+		if this.SysConfig.Logging.LogLevel >= 3 {
 			log.Print(err)
 		}
 
@@ -64,6 +66,9 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 
 	if err != nil {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Collection Request")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE, can not decode Collection Request")
+		}
 		w.Write(statusMessageData)
 		return
 	}
@@ -71,19 +76,25 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Collection Request message did not include an ID")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG-1: BAD_MESSAGE, Collection Request message did not include an ID")
+		}
 		w.Write(statusMessageData)
 		return
 	}
 
-	if this.LogLevel >= 1 {
-		log.Printf("Collection Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
+	if this.SysConfig.Logging.LogLevel >= 1 {
+		log.Printf("DEBUG-1: Collection Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
 	// Get a list of valid collections for this collection request
-	validCollections := this.GetValidCollections()
+	validCollections := this.getValidCollections()
 
 	data := this.createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if this.SysConfig.Logging.LogLevel >= 1 {
+		log.Println("DEBUG-1: Sending Collection Response to", r.RemoteAddr)
+	}
 	w.Write(data)
 
 }
@@ -103,7 +114,7 @@ func (this *CollectionType) createCollectionResponse(inResponseToID string, vali
 		c.AddDescription(v)
 		c.AddVolume(1)
 		//c.SetPushMethodToHttpJson()
-		c.SetPollServiceToHttpJson("http://taxiitest.freetaxii.com/services/poll/")
+		c.SetPollServiceToHttpJson("http://test.freetaxii.com:8000/services/poll/")
 		//c.SetSubscriptionServiceToHttpJson("http://taxiitest.freetaxii.com/services/collection-management/")
 		//c.SetInboxServiceToHttpJson("http://taxiitest.freetaxii.com/services/inbox/")
 
@@ -117,4 +128,47 @@ func (this *CollectionType) createCollectionResponse(inResponseToID string, vali
 		log.Fatal("Unable to create Collection Response Message")
 	}
 	return data
+}
+
+// --------------------------------------------------
+// Get list of valid collections
+// --------------------------------------------------
+
+func (this *CollectionType) getValidCollections() map[string]string {
+
+	// TODO Read in from a database the collections we offer for this authenticated
+	// user and put them in a map
+	// TODO switch from a map to a struct so we can track more than just name and description
+
+	// Open connection to database
+	filename := this.SysConfig.System.DbFileFullPath
+	db, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		log.Fatalf("Unable to open file %s due to error %v", filename, err)
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT collection, description FROM Collections")
+	if err != nil {
+		log.Printf("error running query, %v", err)
+	}
+	defer rows.Close()
+
+	c := make(map[string]string)
+
+	for rows.Next() {
+		var collection string
+		var description string
+		err = rows.Scan(&collection, &description)
+
+		if err != nil {
+			log.Printf("error reading from database, %v", err)
+		}
+
+		c[collection] = description
+	}
+
+	// c["ip-watch-list"] = "List of interesting IP addresses"
+	// c["url-watch-list"] = "List of interesting URL addresses"
+	return c
 }
