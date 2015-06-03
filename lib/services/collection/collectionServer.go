@@ -16,7 +16,7 @@ import (
 )
 
 type CollectionType struct {
-	DebugLevel     int
+	LogLevel       int
 	DbFileFullPath string
 }
 
@@ -25,13 +25,13 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 	var taxiiHeader headers.HttpHeaderType
 	var statusMsg status.StatusType
 
-	if this.DebugLevel >= 3 {
+	if this.LogLevel >= 3 {
 		log.Printf("Found Message on Collection Server Handler from %s", r.RemoteAddr)
 	}
 
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
-	if this.DebugLevel >= 5 {
+	if this.LogLevel >= 5 {
 		taxiiHeader.DebugHttpRequest(r)
 	}
 
@@ -42,7 +42,7 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 
 	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.DebugLevel >= 2 {
+		if this.LogLevel >= 3 {
 			log.Print(err)
 		}
 
@@ -75,7 +75,7 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if this.DebugLevel >= 1 {
+	if this.LogLevel >= 1 {
 		log.Printf("Collection Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 

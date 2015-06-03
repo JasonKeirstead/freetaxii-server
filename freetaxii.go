@@ -8,11 +8,11 @@ package main
 
 import (
 	"code.google.com/p/getopt"
-	"encoding/json"
 	"fmt"
-	"github.com/freetaxii/freetaxii-server/lib/services/collection"
+	"github.com/freetaxii/freetaxii-server/lib/config"
+	// "github.com/freetaxii/freetaxii-server/lib/services/collection"
 	"github.com/freetaxii/freetaxii-server/lib/services/discovery"
-	"github.com/freetaxii/freetaxii-server/lib/services/poll"
+	// "github.com/freetaxii/freetaxii-server/lib/services/poll"
 	"log"
 	"net/http"
 	"os"
@@ -20,31 +20,11 @@ import (
 
 const (
 	DEFAULT_CONFIG_FILENAME = "etc/freetaxii.conf"
-	DEFAULT_LOG_FILENAME    = "logs/freetaxii.log"
 )
 
-type ConfigFileType struct {
-	System struct {
-		DebugLevel      int
-		Listen          string
-		Prefix          string
-		LogFile         string
-		DbFile          string
-		LogFileFullPath string
-		DbFileFullPath  string
-	}
-	Services struct {
-		Discovery  string
-		Collection string
-		Poll       string
-	}
-}
-
 var sVersion = "0.2.1"
-var DebugLevel int = 0
 
 var sOptConfigFilename = getopt.StringLong("config", 'c', DEFAULT_CONFIG_FILENAME, "Configuration File", "string")
-var sOptLogFilename = getopt.StringLong("logfile", 'f', DEFAULT_LOG_FILENAME, "Server Log File", "string")
 var bOptHelp = getopt.BoolLong("help", 0, "Help")
 var bOptVer = getopt.BoolLong("version", 0, "Version")
 
@@ -63,78 +43,46 @@ func main() {
 	}
 
 	// --------------------------------------------------
-	// Load Configuration File
+	// Load System Configuration
 	// --------------------------------------------------
 
-	sysConfigFilename := *sOptConfigFilename
-	sysConfigFile, err := os.Open(sysConfigFilename)
-	if err != nil {
-		log.Fatalf("error opening configuration file: %v", err)
-	}
-
-	// --------------------------------------------------
-	// Decode JSON configuration file
-	// --------------------------------------------------
-	// Use decoder instead of unmarshal so we can handle stream data
-	decoder := json.NewDecoder(sysConfigFile)
-	var syscfg ConfigFileType
-	err = decoder.Decode(&syscfg)
-
-	if err != nil {
-		log.Fatalf("error parsing configuration file %v", err)
-	}
-
-	// Lets assign the full paths to a few variables so we can use them later
-	syscfg.System.DbFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.DbFile
-	syscfg.System.LogFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.LogFile
-
-	// --------------------------------------------------
-	// Setup Debug Level
-	// --------------------------------------------------
-
-	if syscfg.System.DebugLevel >= 0 && syscfg.System.DebugLevel <= 5 {
-		DebugLevel = syscfg.System.DebugLevel
-	}
+	var syscfg config.ServerConfigType
+	syscfg.LoadConfig(*sOptConfigFilename)
 
 	// --------------------------------------------------
 	// Setup Logging File
 	// --------------------------------------------------
-	// The default location for the logs is ./etc/freetaxii.log
-	// If a log file location is passed in via the command line flags, then lets
-	// use it. Otherwise, lets look in the configuration file.  If nothing is
-	// there, then we will use the default.
-
 	// TODO
 	// Need to make the directory if it does not already exist
 	// To do this, we need to split the filename from the directory, we will want to only
 	// take the last bit in case there is multiple directories /etc/foo/bar/stuff.log
 
-	sysLogFilename := *sOptLogFilename
-	if sysLogFilename == DEFAULT_LOG_FILENAME && syscfg.System.LogFile != "" {
-		sysLogFilename = syscfg.System.LogFile
-	}
+	// Only enable logging to a file if it is turned on in the configuration file
+	if syscfg.Logging.Enabled == true {
+		logFile, err := os.OpenFile(syscfg.Logging.LogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("error opening file: %v", err)
+		}
+		defer logFile.Close()
 
-	logFile, err := os.OpenFile(sysLogFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
+		log.SetOutput(logFile)
 	}
-	defer logFile.Close()
-
-	log.SetOutput(logFile)
-	log.Println("Starting FreeTAXII Server")
 
 	// --------------------------------------------------
 	// Setup Directory Path Handlers
 	// --------------------------------------------------
 	// Make sure there is a directory path defined in the configuration file
 	// for each service we want to listen on.
+	log.Println("Starting FreeTAXII Server")
 	serviceCounter := 0
 
 	var taxiiDiscoveryServer discovery.DiscoveryType
-	taxiiDiscoveryServer.DebugLevel = DebugLevel
+	taxiiDiscoveryServer.SysConfig = &syscfg
+
 	taxiiDiscoveryServer.ReloadServices = true
-	fmt.Println("DEBUG: Setting Reload Services to true")
-	taxiiDiscoveryServer.DbFileFullPath = syscfg.System.DbFileFullPath
+	if syscfg.Logging.LogLevel >= 3 {
+		log.Println("DEBUG: Setting reload services to true")
+	}
 
 	if syscfg.Services.Discovery != "" {
 		log.Println("Starting TAXII Discovery services at:", syscfg.Services.Discovery)
@@ -142,25 +90,25 @@ func main() {
 		serviceCounter++
 	}
 
-	var taxiiCollectionServer collection.CollectionType
-	taxiiCollectionServer.DebugLevel = DebugLevel
-	taxiiCollectionServer.DbFileFullPath = syscfg.System.DbFileFullPath
+	// var taxiiCollectionServer collection.CollectionType
+	// taxiiCollectionServer.LogLevel = LogLevel
+	// taxiiCollectionServer.DbFileFullPath = syscfg.System.DbFileFullPath
 
-	if syscfg.Services.Collection != "" {
-		log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
-		http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
-		serviceCounter++
-	}
+	// if syscfg.Services.Collection != "" {
+	// 	log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
+	// 	http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
+	// 	serviceCounter++
+	// }
 
-	var taxiiPollServer poll.PollType
-	taxiiPollServer.DebugLevel = DebugLevel
-	taxiiPollServer.DbFileFullPath = syscfg.System.DbFileFullPath
+	// var taxiiPollServer poll.PollType
+	// taxiiPollServer.LogLevel = LogLevel
+	// taxiiPollServer.DbFileFullPath = syscfg.System.DbFileFullPath
 
-	if syscfg.Services.Poll != "" {
-		log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)
-		http.HandleFunc(syscfg.Services.Poll, taxiiPollServer.PollServerHandler)
-		serviceCounter++
-	}
+	// if syscfg.Services.Poll != "" {
+	// 	log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)
+	// 	http.HandleFunc(syscfg.Services.Poll, taxiiPollServer.PollServerHandler)
+	// 	serviceCounter++
+	// }
 
 	if serviceCounter == 0 {
 		log.Fatalln("No TAXII services defined")

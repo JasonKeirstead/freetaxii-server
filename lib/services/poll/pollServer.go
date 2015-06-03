@@ -17,7 +17,7 @@ import (
 )
 
 type PollType struct {
-	DebugLevel     int
+	LogLevel       int
 	DbFileFullPath string
 }
 
@@ -27,13 +27,13 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	var statusMsg status.StatusType
 	var taxiiCollections collection.CollectionType
 
-	if this.DebugLevel >= 3 {
+	if this.LogLevel >= 3 {
 		log.Printf("Found Message on Poll Server Handler from %s", r.RemoteAddr)
 	}
 
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
-	if this.DebugLevel >= 5 {
+	if this.LogLevel >= 5 {
 		taxiiHeader.DebugHttpRequest(r)
 	}
 
@@ -44,7 +44,7 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 
 	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.DebugLevel >= 2 {
+		if this.LogLevel >= 3 {
 			log.Print(err)
 		}
 
@@ -77,7 +77,7 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if this.DebugLevel >= 1 {
+	if this.LogLevel >= 1 {
 		log.Printf("Poll Request from %s for %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.CollectionName, requestMessageData.TaxiiMessage.Id)
 	}
 

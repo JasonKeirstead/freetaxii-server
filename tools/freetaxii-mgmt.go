@@ -22,14 +22,18 @@ const (
 	DEFAULT_CONFIG_FILENAME = "../etc/freetaxii.conf"
 )
 
-type ConfigFileType struct {
+type ServerConfigType struct {
 	System struct {
-		DebugLevel      int
-		Prefix          string
+		Listen         string
+		Prefix         string
+		DbFile         string
+		DbFileFullPath string
+	}
+	Logging struct {
+		Enabled         bool
 		LogFile         string
-		DbFile          string
+		DebugLevel      int
 		LogFileFullPath string
-		DbFileFullPath  string
 	}
 }
 
@@ -72,7 +76,7 @@ func main() {
 	// --------------------------------------------------
 	// Use decoder instead of unmarshal so we can handle stream data
 	decoder := json.NewDecoder(sysConfigFileData)
-	var syscfg ConfigFileType
+	var syscfg SystemConfigType
 	err = decoder.Decode(&syscfg)
 
 	if err != nil {
@@ -81,14 +85,14 @@ func main() {
 
 	// Lets assign the full paths to a few variables so we can use them later
 	syscfg.System.DbFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.DbFile
-	syscfg.System.LogFileFullPath = syscfg.System.Prefix + "/" + syscfg.System.LogFile
+	syscfg.Logging.LogFileFullPath = syscfg.System.Prefix + "/" + syscfg.Logging.LogFile
 
 	// --------------------------------------------------
 	// Setup Debug Level
 	// --------------------------------------------------
 
-	if syscfg.System.DebugLevel >= 0 && syscfg.System.DebugLevel <= 5 {
-		DebugLevel = syscfg.System.DebugLevel
+	if syscfg.Logging.DebugLevel >= 0 && syscfg.Logging.DebugLevel <= 5 {
+		DebugLevel = syscfg.Logging.DebugLevel
 	}
 
 	// --------------------------------------------------
@@ -104,19 +108,23 @@ func main() {
 	// To do this, we need to split the filename from the directory, we will want to only
 	// take the last bit in case there is multiple directories /etc/foo/bar/stuff.log
 
-	sysLogFilename := syscfg.System.LogFileFullPath
+	sysLogFilename := syscfg.Logging.LogFileFullPath
 
 	if DebugLevel >= 3 {
-		log.Println("Mgmt - Using the following log file", sysLogFilename)
+		log.Println("M: - Using the following log file", sysLogFilename)
 	}
 
-	logFile, err := os.OpenFile(sysLogFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer logFile.Close()
+	// Only enable logging to a file if it is turned on in the configuration file
+	if syscfg.Logging.Enabled == true {
+		logFile, err := os.OpenFile(sysLogFilename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("M: error opening file: %v", err)
+		}
+		defer logFile.Close()
 
-	log.SetOutput(logFile)
+		log.SetOutput(logFile)
+	}
+
 	log.Println("Starting FreeTAXII Management")
 
 	// --------------------------------------------------
@@ -130,7 +138,7 @@ func main() {
 	defer db.Close()
 
 	if DebugLevel >= 3 {
-		log.Println("Mgmt - Using the following database file", filename)
+		log.Println("M: Using the following database file", filename)
 	}
 
 	// --------------------------------------------------
@@ -155,7 +163,7 @@ func main() {
 func listCollections(db *sql.DB) {
 	rows, err := db.Query("SELECT * FROM Collections")
 	if err != nil {
-		log.Printf("Mgmt - error running query, %v", err)
+		log.Printf("M: error running query, %v", err)
 	}
 	defer rows.Close()
 
@@ -167,7 +175,7 @@ func listCollections(db *sql.DB) {
 		var description string
 		err = rows.Scan(&id, &collection, &description)
 		if err != nil {
-			log.Printf("Mgmt - error reading from database, %v", err)
+			log.Printf("M: error reading from database, %v", err)
 		}
 		fmt.Printf("\t%-10s \t %s\n", collection, description)
 	}
@@ -186,11 +194,11 @@ func addCollection(db *sql.DB) {
 
 	_, err := db.Exec("INSERT INTO Collections (collection, description) values (?, ?)", collectionName, collectionDescription)
 	if err != nil {
-		log.Printf("Mgmt - Unable to insert record due to error %v", err)
+		log.Printf("M: Unable to insert record due to error %v", err)
 	}
 
 	if DebugLevel >= 1 {
-		log.Printf("Mgmt - Inserted %s in to table Collections", collectionName)
+		log.Printf("M: Inserted %s in to table Collections", collectionName)
 	}
 }
 
@@ -203,13 +211,13 @@ func delCollection(db *sql.DB) {
 
 	_, err := db.Exec("DELETE FROM Collections where (collection=?)", collectionName)
 	if err != nil {
-		log.Printf("Mgmt - Unable to delete record due to error %v", err)
+		log.Printf("M: Unable to delete record due to error %v", err)
 	}
 
 	// TODO this does not work right if the value is not in the database. It says it was deleted
 	// when it was not, need to catch that error
 	if DebugLevel >= 1 {
-		log.Printf("Mgmt - Deleted %s from table Collections", collectionName)
+		log.Printf("M: Deleted %s from table Collections", collectionName)
 	}
 }
 

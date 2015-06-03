@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/discovery"
@@ -19,10 +20,9 @@ import (
 )
 
 type DiscoveryType struct {
-	DebugLevel     int
-	DbFileFullPath string
-	ReloadServices bool
-	Services       []DiscoveryServiceType
+	SysConfig         *config.ServerConfigType
+	ReloadServices    bool
+	DiscoveryServices []DiscoveryServiceType
 }
 
 type DiscoveryServiceType struct {
@@ -36,13 +36,13 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 	var taxiiHeader headers.HttpHeaderType
 	var statusMsg status.StatusType
 
-	if this.DebugLevel >= 3 {
+	if this.SysConfig.Logging.LogLevel >= 3 {
 		log.Printf("Found Message on Discovery Server Handler from %s", r.RemoteAddr)
 	}
 
 	// We need to put this first so that during debugging we can see problems
 	// that will generate errors below.
-	if this.DebugLevel >= 5 {
+	if this.SysConfig.Logging.LogLevel >= 5 {
 		taxiiHeader.DebugHttpRequest(r)
 	}
 
@@ -53,7 +53,7 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 
 	err = taxiiHeader.VerifyHttpTaxiiHeaderValues(r)
 	if err != nil {
-		if this.DebugLevel >= 2 {
+		if this.SysConfig.Logging.LogLevel >= 3 {
 			log.Print(err)
 		}
 
@@ -75,6 +75,9 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 
 	if err != nil {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG: BAD_MESSAGE, can not decode Discovery Request")
+		}
 		w.Write(statusMessageData)
 		return
 	}
@@ -82,18 +85,23 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 	// Check to make sure their is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
+		if this.SysConfig.Logging.LogLevel >= 1 {
+			log.Println("DEBUG: BAD_MESSAGE, Discovery Request message did not include an ID")
+		}
 		w.Write(statusMessageData)
 		return
 	}
 
-	if this.DebugLevel >= 1 {
+	if this.SysConfig.Logging.LogLevel >= 1 {
 		log.Printf("Discovery Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
 	if this.ReloadServices == true {
 		this.loadServices()
 		this.ReloadServices = false
-		fmt.Println("DEBUG: Setting Reload Services to false")
+		if this.SysConfig.Logging.LogLevel >= 3 {
+			fmt.Println("DEBUG: Setting Reload Services to false")
+		}
 	}
 
 	data := this.createDiscoveryResponse(requestMessageData.TaxiiMessage.Id)
@@ -139,10 +147,10 @@ func (this *DiscoveryType) createDiscoveryResponse(responseid string) []byte {
 func (this *DiscoveryType) loadServices() {
 
 	// Clear out existing data so when we reload we do not have a contaminated array
-	this.Services = nil
+	this.DiscoveryServices = nil
 
 	// Open connection to database
-	filename := this.DbFileFullPath
+	filename := this.SysConfig.System.DbFileFullPath
 	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		log.Fatalf("Unable to open file %s due to error %v", filename, err)
@@ -180,6 +188,6 @@ func (this *DiscoveryType) loadServices() {
 		services.Address = address
 
 		// Add services to object
-		this.Services = append(this.Services, services)
+		this.DiscoveryServices = append(this.DiscoveryServices, services)
 	}
 }
