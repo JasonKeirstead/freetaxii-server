@@ -9,7 +9,6 @@ package discovery
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
@@ -20,8 +19,12 @@ import (
 )
 
 type DiscoveryType struct {
-	SysConfig         *config.ServerConfigType
-	ReloadServices    bool
+	SysConfig      *config.ServerConfigType
+	ReloadServices bool
+	DiscoveryServicesType
+}
+
+type DiscoveryServicesType struct {
 	DiscoveryServices []DiscoveryServiceType
 }
 
@@ -37,7 +40,7 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 	var statusMsg status.StatusType
 
 	if this.SysConfig.Logging.LogLevel >= 3 {
-		log.Printf("Found Message on Discovery Server Handler from %s", r.RemoteAddr)
+		log.Printf("DEBUG-3: Found Message on Discovery Server Handler from %s", r.RemoteAddr)
 	}
 
 	// We need to put this first so that during debugging we can see problems
@@ -76,7 +79,7 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 	if err != nil {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
 		if this.SysConfig.Logging.LogLevel >= 1 {
-			log.Println("DEBUG: BAD_MESSAGE, can not decode Discovery Request")
+			log.Println("DEBUG-1: BAD_MESSAGE, can not decode Discovery Request")
 		}
 		w.Write(statusMessageData)
 		return
@@ -86,51 +89,67 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 	if requestMessageData.TaxiiMessage.Id == "" {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
 		if this.SysConfig.Logging.LogLevel >= 1 {
-			log.Println("DEBUG: BAD_MESSAGE, Discovery Request message did not include an ID")
+			log.Println("DEBUG-1: BAD_MESSAGE, Discovery Request message did not include an ID")
 		}
 		w.Write(statusMessageData)
 		return
 	}
 
 	if this.SysConfig.Logging.LogLevel >= 1 {
-		log.Printf("Discovery Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
+		log.Printf("DEBUG-1: Discovery Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
 	}
 
+	if this.SysConfig.Logging.LogLevel >= 3 {
+		log.Println("DEBUG-3: Reload Services is currently set to", this.ReloadServices)
+	}
 	if this.ReloadServices == true {
 		this.loadServices()
 		this.ReloadServices = false
 		if this.SysConfig.Logging.LogLevel >= 3 {
-			fmt.Println("DEBUG: Setting Reload Services to false")
+			log.Println("DEBUG-3: Setting Reload Services to false")
 		}
 	}
 
-	data := this.createDiscoveryResponse(requestMessageData.TaxiiMessage.Id)
+	data := this.createDiscoveryResponse(requestMessageData.TaxiiMessage.Id, this.DiscoveryServices)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
+	if this.SysConfig.Logging.LogLevel >= 1 {
+		log.Println("DEBUG-1: Sending Discovery Response to", r.RemoteAddr)
+	}
 }
 
 // --------------------------------------------------
 // Create a TAXII Discovery Response Message
 // --------------------------------------------------
 
-func (this *DiscoveryType) createDiscoveryResponse(responseid string) []byte {
+func (this *DiscoveryType) createDiscoveryResponse(responseid string, ds []DiscoveryServiceType) []byte {
 	tm := discovery.NewResponse()
 	tm.AddInResponseTo(responseid)
 
-	var s1 discovery.ServiceType
-	s1.SetTypeDiscovery()
-	s1.SetAvailable()
-	s1.SetStandardTaxiiHttpJson()
-	s1.AddAddress("http://taxiitest.freetaxii.com/services/discovery")
+	for _, value := range ds {
+		var s discovery.ServiceType
 
-	var s2 discovery.ServiceType
-	s2.SetTypeCollection()
-	s2.SetAvailable()
-	s2.SetStandardTaxiiHttpJson()
-	s2.AddAddress("http://taxiitest.freetaxii.com/services/collection")
+		switch value.ServiceType {
+		case "Discovery":
+			s.SetTypeDiscovery()
+		case "Collection":
+			s.SetTypeCollection()
+		case "Poll":
+			s.SetTypePoll()
+		case "Inbox":
+			s.SetTypeInbox()
+		}
 
-	tm.AddService(s1)
-	tm.AddService(s2)
+		switch value.Available {
+		case true:
+			s.SetAvailable()
+		case false:
+			s.SetUnavailable()
+		}
+		s.SetStandardTaxiiHttpJson()
+		s.AddAddress(value.Address)
+		tm.AddService(s)
+	}
 
 	data, err := json.Marshal(tm)
 	if err != nil {
@@ -145,6 +164,10 @@ func (this *DiscoveryType) createDiscoveryResponse(responseid string) []byte {
 // Load Services from Database
 // --------------------------------------------------
 func (this *DiscoveryType) loadServices() {
+
+	if this.SysConfig.Logging.LogLevel >= 1 {
+		log.Println("DEBUG-1: Reloading Discovery Services")
+	}
 
 	// Clear out existing data so when we reload we do not have a contaminated array
 	this.DiscoveryServices = nil

@@ -79,9 +79,11 @@ func main() {
 	var taxiiDiscoveryServer discovery.DiscoveryType
 	taxiiDiscoveryServer.SysConfig = &syscfg
 
+	// TODO need to add the ability to signal this process and change the flag from false to true
+	// so that it will be reloaded.
 	taxiiDiscoveryServer.ReloadServices = true
 	if syscfg.Logging.LogLevel >= 3 {
-		log.Println("DEBUG: Setting reload services to true")
+		log.Println("DEBUG-3: Setting reload services to true")
 	}
 
 	if syscfg.Services.Discovery != "" {
