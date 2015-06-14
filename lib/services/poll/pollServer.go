@@ -8,6 +8,7 @@ package poll
 
 import (
 	"encoding/json"
+	"github.com/freestix/libstix/stix"
 	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
@@ -94,10 +95,12 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	// --------------------------------------------------
 	// Check for valid collection
 	// --------------------------------------------------
-	// TODO move to a database or configuration file
-	// TODO move to config package
 
 	currentlyValidCollections := this.SysConfig.GetValidCollections()
+
+	// First check to make sure the value the requested is something they can actually get by their username / subscription / avaliable
+	// Based on the collection they are requesting, create a response that contains just the values for that collection
+	// Need to pull the values from the database.
 
 	if val, ok := currentlyValidCollections[requestMessageData.TaxiiMessage.CollectionName]; ok {
 		data := this.createPollResponse(requestMessageData.TaxiiMessage.Id, val)
@@ -129,7 +132,7 @@ func (this *PollType) createPollResponse(responseid, collectionName string) []by
 	tm.AddMessage("This is a test service for FreeTAXII")
 	content := poll.CreateContentBlock()
 	content.SetContentEncodingToXml()
-	indicators := this.createIndicatorsXML()
+	indicators := this.createIndicatorsJSON()
 	content.AddContent(indicators)
 	tm.AddContentBlock(content)
 
@@ -140,6 +143,26 @@ func (this *PollType) createPollResponse(responseid, collectionName string) []by
 		log.Fatal("Unable to create Poll Response Message")
 	}
 	return data
+}
+
+func (this *PollType) createIndicatorsJSON() string {
+	s := stix.New()
+	i1 := s.NewIndicator()
+
+	i1.SetTimestampToNow()
+	i1.AddTitle("Attack 2015-02")
+	i1.AddType("IP Watchlist")
+	observable_i1 := i1.NewObservable()
+	properties_1 := observable_i1.GetObjectProperties()
+
+	properties_1.AddType("URL")
+	properties_1.AddEqualsUriValue("http://foo.com")
+	properties_1.AddEqualsUriValue("http://bar.com")
+	properties_1.AddEqualsUriValue("http://fooandbar.com")
+
+	var data []byte
+	data, _ = json.Marshal(s)
+	return s
 }
 
 func (this *PollType) createIndicatorsXML() string {
