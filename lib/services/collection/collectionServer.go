@@ -7,13 +7,11 @@
 package collection
 
 import (
-	"database/sql"
 	"encoding/json"
 	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/collection"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 )
@@ -91,7 +89,7 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 	}
 
 	// Get a list of valid collections for this collection request
-	validCollections := this.GetValidCollections()
+	validCollections := this.SysConfig.GetValidCollections()
 
 	data := this.createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -131,47 +129,4 @@ func (this *CollectionType) createCollectionResponse(inResponseToID string, vali
 		log.Fatal("Unable to create Collection Response Message")
 	}
 	return data
-}
-
-// --------------------------------------------------
-// Get list of valid collections
-// --------------------------------------------------
-
-func (this *CollectionType) GetValidCollections() map[string]string {
-
-	// TODO Read in from a database the collections we offer for this authenticated
-	// user and put them in a map
-	// TODO switch from a map to a struct so we can track more than just name and description
-
-	// Open connection to database
-	filename := this.SysConfig.System.DbFileFullPath
-	db, err := sql.Open("sqlite3", filename)
-	if err != nil {
-		log.Fatalf("Unable to open file %s due to error %v", filename, err)
-	}
-	defer db.Close()
-
-	rows, err := db.Query("SELECT collection, description FROM Collections")
-	if err != nil {
-		log.Printf("error running query, %v", err)
-	}
-	defer rows.Close()
-
-	c := make(map[string]string)
-
-	for rows.Next() {
-		var collection string
-		var description string
-		err = rows.Scan(&collection, &description)
-
-		if err != nil {
-			log.Printf("error reading from database, %v", err)
-		}
-
-		c[collection] = description
-	}
-
-	// c["ip-watch-list"] = "List of interesting IP addresses"
-	// c["url-watch-list"] = "List of interesting URL addresses"
-	return c
 }

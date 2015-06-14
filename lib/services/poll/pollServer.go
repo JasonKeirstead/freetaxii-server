@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/freetaxii-server/lib/services/collection"
 	"github.com/freetaxii/freetaxii-server/lib/services/status"
 	"github.com/freetaxii/libtaxii/poll"
 	"log"
@@ -25,9 +24,8 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	var err error
 	var taxiiHeader headers.HttpHeaderType
 	var statusMsg status.StatusType
-	var taxiiCollections collection.CollectionType
-	taxiiCollections.SysConfig = this.SysConfig
 
+	// Log notice of incoming TAXII message
 	if this.SysConfig.Logging.LogLevel >= 3 {
 		log.Printf("DEBUG-3: Found Message on Poll Server Handler from %s", r.RemoteAddr)
 	}
@@ -64,6 +62,7 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	// Decode incoming request message
 	// --------------------------------------------------
 	// Use decoder instead of unmarshal so we can handle stream data
+
 	decoder := json.NewDecoder(r.Body)
 	var requestMessageData poll.TaxiiPollRequestType
 	err = decoder.Decode(&requestMessageData)
@@ -77,7 +76,7 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Check to make sure their is a message ID in the request message
+	// Check to make sure there is a message ID in the request message
 	if requestMessageData.TaxiiMessage.Id == "" {
 		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
 		if this.SysConfig.Logging.LogLevel >= 1 {
@@ -87,6 +86,7 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Log notice of incomming Poll Request
 	if this.SysConfig.Logging.LogLevel >= 1 {
 		log.Printf("DEBUG-1: Poll Request from %s for %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.CollectionName, requestMessageData.TaxiiMessage.Id)
 	}
@@ -94,9 +94,10 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	// --------------------------------------------------
 	// Check for valid collection
 	// --------------------------------------------------
-
 	// TODO move to a database or configuration file
-	currentlyValidCollections := taxiiCollections.GetValidCollections()
+	// TODO move to config package
+
+	currentlyValidCollections := this.SysConfig.GetValidCollections()
 
 	if val, ok := currentlyValidCollections[requestMessageData.TaxiiMessage.CollectionName]; ok {
 		data := this.createPollResponse(requestMessageData.TaxiiMessage.Id, val)
