@@ -161,7 +161,12 @@ func (this *PollType) createIndicatorsJSON() string {
 	properties_1.AddEqualsUriValue("http://fooandbar.com")
 
 	var data []byte
-	data, _ = json.Marshal(s)
+	if this.SysConfig.Poll.Indent == true {
+		data, _ = json.MarshalIndent(s, "", "    ")
+	} else {
+		data, _ = json.Marshal(s)
+	}
+
 	return string(data)
 }
 

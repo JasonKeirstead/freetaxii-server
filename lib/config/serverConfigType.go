@@ -38,6 +38,9 @@ type ServerConfigType struct {
 		Collection string
 		Poll       string
 	}
+	Poll struct {
+		Indent bool
+	}
 }
 
 // --------------------------------------------------
