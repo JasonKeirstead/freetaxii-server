@@ -162,7 +162,7 @@ func (this *PollType) createIndicatorsJSON() string {
 
 	var data []byte
 	data, _ = json.Marshal(s)
-	return s
+	return string(data)
 }
 
 func (this *PollType) createIndicatorsXML() string {
