@@ -73,8 +73,13 @@ func main() {
 	// --------------------------------------------------
 	// Make sure there is a directory path defined in the configuration file
 	// for each service we want to listen on.
+
 	log.Println("Starting FreeTAXII Server")
 	serviceCounter := 0
+
+	// --------------------------------------------------
+	// Setup Discovery Server
+	// --------------------------------------------------
 
 	var taxiiDiscoveryServer discovery.DiscoveryType
 	taxiiDiscoveryServer.SysConfig = &syscfg
@@ -92,6 +97,10 @@ func main() {
 		serviceCounter++
 	}
 
+	// --------------------------------------------------
+	// Setup Collection Server
+	// --------------------------------------------------
+
 	var taxiiCollectionServer collection.CollectionType
 	taxiiCollectionServer.SysConfig = &syscfg
 
@@ -100,6 +109,10 @@ func main() {
 		http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
 		serviceCounter++
 	}
+
+	// --------------------------------------------------
+	// Setup Poll Server
+	// --------------------------------------------------
 
 	var taxiiPollServer poll.PollType
 	taxiiPollServer.SysConfig = &syscfg
