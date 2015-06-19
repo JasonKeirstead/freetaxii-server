@@ -10,9 +10,7 @@ import (
 	"code.google.com/p/getopt"
 	"fmt"
 	"github.com/freetaxii/freetaxii-server/lib/config"
-	"github.com/freetaxii/freetaxii-server/lib/services/collection"
-	"github.com/freetaxii/freetaxii-server/lib/services/discovery"
-	"github.com/freetaxii/freetaxii-server/lib/services/poll"
+	"github.com/freetaxii/freetaxii-server/lib/taxiiserver"
 	"log"
 	"net/http"
 	"os"
@@ -78,22 +76,26 @@ func main() {
 	serviceCounter := 0
 
 	// --------------------------------------------------
-	// Setup Discovery Server
+	// Setup Server Object for a listeners
 	// --------------------------------------------------
 
-	var taxiiDiscoveryServer discovery.DiscoveryType
-	taxiiDiscoveryServer.SysConfig = &syscfg
+	var taxiiServerObject taxiiserver.ServerType
+	taxiiServerObject.SysConfig = &syscfg
 
-	// TODO need to add the ability to signal this process and change the flag from false to true
-	// so that it will be reloaded.
-	taxiiDiscoveryServer.ReloadServices = true
+	// TODO need to add the ability to signal this process and change the flag
+	// from false to true so that it will be reloaded.
+	taxiiServerObject.ReloadServices = true
 	if syscfg.Logging.LogLevel >= 3 {
 		log.Println("DEBUG-3: Setting reload services to true")
 	}
 
+	// --------------------------------------------------
+	// Setup Discovery Server
+	// --------------------------------------------------
+
 	if syscfg.Services.Discovery != "" {
 		log.Println("Starting TAXII Discovery services at:", syscfg.Services.Discovery)
-		http.HandleFunc(syscfg.Services.Discovery, taxiiDiscoveryServer.DiscoveryServerHandler)
+		http.HandleFunc(syscfg.Services.Discovery, taxiiServerObject.DiscoveryServerHandler)
 		serviceCounter++
 	}
 
@@ -101,12 +103,9 @@ func main() {
 	// Setup Collection Server
 	// --------------------------------------------------
 
-	var taxiiCollectionServer collection.CollectionType
-	taxiiCollectionServer.SysConfig = &syscfg
-
 	if syscfg.Services.Collection != "" {
 		log.Println("Starting TAXII Collection services at:", syscfg.Services.Collection)
-		http.HandleFunc(syscfg.Services.Collection, taxiiCollectionServer.CollectionServerHandler)
+		http.HandleFunc(syscfg.Services.Collection, taxiiServerObject.CollectionServerHandler)
 		serviceCounter++
 	}
 
@@ -114,14 +113,15 @@ func main() {
 	// Setup Poll Server
 	// --------------------------------------------------
 
-	var taxiiPollServer poll.PollType
-	taxiiPollServer.SysConfig = &syscfg
-
 	if syscfg.Services.Poll != "" {
 		log.Println("Starting TAXII Poll services at:", syscfg.Services.Poll)
-		http.HandleFunc(syscfg.Services.Poll, taxiiPollServer.PollServerHandler)
+		http.HandleFunc(syscfg.Services.Poll, taxiiServerObject.PollServerHandler)
 		serviceCounter++
 	}
+
+	// --------------------------------------------------
+	// Fail if no services are running
+	// --------------------------------------------------
 
 	if serviceCounter == 0 {
 		log.Fatalln("No TAXII services defined")
@@ -141,12 +141,9 @@ func main() {
 
 }
 
-// func logfileExists(path string) (bool, error) {
-//     _, err := os.Stat(path)
-//     if err == nil { return true, nil }
-//     if os.IsNotExist(err) { return false, nil }
-//     return false, err
-// }
+// --------------------------------------------------
+// Print Help and Version infomration
+// --------------------------------------------------
 
 func printHelp() {
 	printOutputHeader()

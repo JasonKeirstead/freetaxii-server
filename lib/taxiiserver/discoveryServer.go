@@ -4,40 +4,21 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package discovery
+package taxiiserver
 
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/freetaxii-server/lib/services/status"
-	"github.com/freetaxii/libtaxii/discovery"
+	"github.com/freetaxii/libtaxii/discoveryMessage"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 )
 
-type DiscoveryType struct {
-	SysConfig      *config.ServerConfigType
-	ReloadServices bool
-	DiscoveryServicesType
-}
-
-type DiscoveryServicesType struct {
-	DiscoveryServices []DiscoveryServiceType
-}
-
-type DiscoveryServiceType struct {
-	ServiceType string
-	Available   bool
-	Address     string
-}
-
-func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http.Request) {
+func (this *ServerType) DiscoveryServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var taxiiHeader headers.HttpHeaderType
-	var statusMsg status.StatusType
 
 	if this.SysConfig.Logging.LogLevel >= 3 {
 		log.Printf("DEBUG-3: Found Message on Discovery Server Handler from %s", r.RemoteAddr)
@@ -63,10 +44,11 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE", err.Error())
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
@@ -75,36 +57,40 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 	// Decode incoming request message
 	// --------------------------------------------------
 	// Use decoder instead of unmarshal so we can handle stream data
+
 	decoder := json.NewDecoder(r.Body)
-	var requestMessageData discovery.TaxiiDiscoveryRequestType
-	err = decoder.Decode(&requestMessageData)
+	var incomingMessageData discoveryMessage.DiscoveryRequestMessageType
+	err = decoder.Decode(&incomingMessageData)
 
 	if err != nil {
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Discovery Request")
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE, can not decode Discovery Request")
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure their is a message ID in the request message
-	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
+	if incomingMessageData.Id == "" {
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Discovery Request message did not include an ID")
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE, Discovery Request message did not include an ID")
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
 
 	if this.SysConfig.Logging.LogLevel >= 1 {
-		log.Printf("DEBUG-1: Discovery Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
+		log.Printf("DEBUG-1: Discovery Request from %s with ID: %s", r.RemoteAddr, incomingMessageData.Id)
 	}
 
 	if this.SysConfig.Logging.LogLevel >= 3 {
 		log.Println("DEBUG-3: Reload Services is currently set to", this.ReloadServices)
 	}
+
 	if this.ReloadServices == true {
 		this.loadServices()
 		this.ReloadServices = false
@@ -113,7 +99,7 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 		}
 	}
 
-	data := this.createDiscoveryResponse(requestMessageData.TaxiiMessage.Id, this.DiscoveryServices)
+	data := this.createDiscoveryResponse(incomingMessageData.Id, this.CurrentTaxiiServices)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
 	if this.SysConfig.Logging.LogLevel >= 1 {
@@ -122,58 +108,17 @@ func (this *DiscoveryType) DiscoveryServerHandler(w http.ResponseWriter, r *http
 }
 
 // --------------------------------------------------
-// Create a TAXII Discovery Response Message
-// --------------------------------------------------
-
-func (this *DiscoveryType) createDiscoveryResponse(responseid string, ds []DiscoveryServiceType) []byte {
-	tm := discovery.NewResponse()
-	tm.AddInResponseTo(responseid)
-
-	for _, value := range ds {
-		var s discovery.ServiceType
-
-		switch value.ServiceType {
-		case "Discovery":
-			s.SetTypeDiscovery()
-		case "Collection":
-			s.SetTypeCollection()
-		case "Poll":
-			s.SetTypePoll()
-		case "Inbox":
-			s.SetTypeInbox()
-		}
-
-		switch value.Available {
-		case true:
-			s.SetAvailable()
-		case false:
-			s.SetUnavailable()
-		}
-		s.SetStandardTaxiiHttpJson()
-		s.AddAddress(value.Address)
-		tm.AddService(s)
-	}
-
-	data, err := json.Marshal(tm)
-	if err != nil {
-		// If we can not create a status message then there is something
-		// wrong with the APIs and nothing is going to work.
-		log.Fatal("Unable to create Discovery Response Message")
-	}
-	return data
-}
-
-// --------------------------------------------------
 // Load Services from Database
 // --------------------------------------------------
-func (this *DiscoveryType) loadServices() {
+
+func (this *ServerType) loadServices() {
 
 	if this.SysConfig.Logging.LogLevel >= 1 {
 		log.Println("DEBUG-1: Reloading Discovery Services")
 	}
 
 	// Clear out existing data so when we reload we do not have a contaminated array
-	this.DiscoveryServices = nil
+	this.CurrentTaxiiServices = nil
 
 	// Open connection to database
 	filename := this.SysConfig.System.DbFileFullPath
@@ -204,7 +149,7 @@ func (this *DiscoveryType) loadServices() {
 			log.Printf("error reading from database, %v", err)
 		}
 
-		var services DiscoveryServiceType
+		var services TaxiiServiceType
 		services.ServiceType = servicetype
 		if available == 1 {
 			services.Available = true
@@ -214,6 +159,47 @@ func (this *DiscoveryType) loadServices() {
 		services.Address = address
 
 		// Add services to object
-		this.DiscoveryServices = append(this.DiscoveryServices, services)
+		this.CurrentTaxiiServices = append(this.CurrentTaxiiServices, services)
 	}
+}
+
+// --------------------------------------------------
+// Create a TAXII Discovery Response Message
+// --------------------------------------------------
+
+func (this *ServerType) createDiscoveryResponse(responseid string, ds []TaxiiServiceType) []byte {
+	tm := discoveryMessage.NewResponse()
+	tm.AddInResponseTo(responseid)
+
+	for _, value := range ds {
+		s := tm.NewService()
+
+		switch value.ServiceType {
+		case "Discovery":
+			s.SetTypeDiscovery()
+		case "Collection":
+			s.SetTypeCollection()
+		case "Poll":
+			s.SetTypePoll()
+		case "Inbox":
+			s.SetTypeInbox()
+		}
+
+		switch value.Available {
+		case true:
+			s.SetAvailable()
+		case false:
+			s.SetUnavailable()
+		}
+		s.SetStandardTaxiiHttpJson()
+		s.AddAddress(value.Address)
+	}
+
+	data, err := json.Marshal(tm)
+	if err != nil {
+		// If we can not create a status message then there is something
+		// wrong with the APIs and nothing is going to work.
+		log.Fatal("Unable to create Discovery Response Message")
+	}
+	return data
 }

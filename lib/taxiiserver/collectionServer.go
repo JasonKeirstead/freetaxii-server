@@ -4,26 +4,19 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package collection
+package taxiiserver
 
 import (
 	"encoding/json"
-	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/freetaxii-server/lib/services/status"
-	"github.com/freetaxii/libtaxii/collection"
+	"github.com/freetaxii/libtaxii/collectionMessage"
 	"log"
 	"net/http"
 )
 
-type CollectionType struct {
-	SysConfig *config.ServerConfigType
-}
-
-func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {
+func (this *ServerType) CollectionServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var taxiiHeader headers.HttpHeaderType
-	var statusMsg status.StatusType
 
 	if this.SysConfig.Logging.LogLevel >= 3 {
 		log.Printf("DEBUG-3: Found Message on Collection Server Handler from %s", r.RemoteAddr)
@@ -49,10 +42,11 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE", err.Error())
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
@@ -62,54 +56,55 @@ func (this *CollectionType) CollectionServerHandler(w http.ResponseWriter, r *ht
 	// --------------------------------------------------
 	// Use decoder instead of unmarshal so we can handle stream data
 	decoder := json.NewDecoder(r.Body)
-	var requestMessageData collection.TaxiiCollectionRequestType
-	err = decoder.Decode(&requestMessageData)
+	var incomingMessageData collectionMessage.CollectionRequestMessageType
+	err = decoder.Decode(&incomingMessageData)
 
 	if err != nil {
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Collection Request")
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Collection Request")
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE, can not decode Collection Request")
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure their is a message ID in the request message
-	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Collection Request message did not include an ID")
+	if incomingMessageData.Id == "" {
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Collection Request message did not include an ID")
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE, Collection Request message did not include an ID")
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
 
 	if this.SysConfig.Logging.LogLevel >= 1 {
-		log.Printf("DEBUG-1: Collection Request from %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.Id)
+		log.Printf("DEBUG-1: Collection Request from %s with ID: %s", r.RemoteAddr, incomingMessageData.Id)
 	}
 
 	// Get a list of valid collections for this collection request
 	validCollections := this.SysConfig.GetValidCollections()
 
-	data := this.createCollectionResponse(requestMessageData.TaxiiMessage.Id, validCollections)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	data := this.createCollectionResponse(incomingMessageData.Id, validCollections)
 	if this.SysConfig.Logging.LogLevel >= 1 {
 		log.Println("DEBUG-1: Sending Collection Response to", r.RemoteAddr)
 	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(data)
-
 }
 
 // --------------------------------------------------
 // Create a TAXII Collection Response Message
 // --------------------------------------------------
 
-func (this *CollectionType) createCollectionResponse(inResponseToID string, validCollections map[string]string) []byte {
-	tm := collection.NewResponse()
+func (this *ServerType) createCollectionResponse(inResponseToID string, validCollections map[string]string) []byte {
+	tm := collectionMessage.NewResponse()
 	tm.AddInResponseTo(inResponseToID)
 
 	for k, v := range validCollections {
-		c := collection.CreateCollection()
+		c := tm.NewCollection()
 		c.AddName(k)
 		c.SetAvailable()
 		c.AddDescription(v)
@@ -118,8 +113,6 @@ func (this *CollectionType) createCollectionResponse(inResponseToID string, vali
 		c.SetPollServiceToHttpJson("http://test.freetaxii.com:8000/services/poll/")
 		//c.SetSubscriptionServiceToHttpJson("http://taxiitest.freetaxii.com/services/collection-management/")
 		//c.SetInboxServiceToHttpJson("http://taxiitest.freetaxii.com/services/inbox/")
-
-		tm.AddCollection(c)
 	}
 
 	data, err := json.Marshal(tm)

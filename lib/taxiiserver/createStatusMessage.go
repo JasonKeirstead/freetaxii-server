@@ -4,24 +4,20 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package status
+package taxiiserver
 
 import (
 	"encoding/json"
-	"github.com/freetaxii/libtaxii/status"
+	"github.com/freetaxii/libtaxii/statusMessage"
 	"log"
 )
-
-type StatusType struct {
-	DebugLevel int
-}
 
 // --------------------------------------------------
 // Create a TAXII Status Message
 // --------------------------------------------------
 
-func (this *StatusType) CreateTaxiiStatusMessage(responseid, msgType, msg string) []byte {
-	tm := status.New()
+func (this *ServerType) CreateTaxiiStatusMessage(responseid, msgType, msg string) []byte {
+	tm := statusMessage.New()
 	tm.AddType(msgType)
 	if responseid != "" {
 		tm.AddResponseId(responseid)
@@ -30,7 +26,7 @@ func (this *StatusType) CreateTaxiiStatusMessage(responseid, msgType, msg string
 
 	data, err := json.Marshal(tm)
 	if err != nil {
-		// If we can not create a discovery response then there is something
+		// If we can not create a status message response then there is something
 		// wrong with the APIs and nothing is going to work.
 		log.Fatal("Unable to create Discovery Response Message")
 	}

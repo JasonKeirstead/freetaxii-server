@@ -4,29 +4,22 @@
 // that can be found in the LICENSE file in the root of the source
 // tree.
 
-package poll
+package taxiiserver
 
 import (
 	"encoding/json"
 	"github.com/freestix/libstix/stix"
-	"github.com/freetaxii/freetaxii-server/lib/config"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/freetaxii-server/lib/services/status"
-	"github.com/freetaxii/libtaxii/poll"
+	"github.com/freetaxii/libtaxii/pollMessage"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
 )
 
-type PollType struct {
-	SysConfig *config.ServerConfigType
-}
-
-func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
+func (this *ServerType) PollServerHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var taxiiHeader headers.HttpHeaderType
-	var statusMsg status.StatusType
 
 	// Log notice of incoming TAXII message
 	if this.SysConfig.Logging.LogLevel >= 3 {
@@ -53,10 +46,11 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 		// If the headers are not right we will not attempt to read the message.
 		// This also means that we will not have an InReponseTo ID for the
 		// createTaxiiStatusMessage function
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", err.Error())
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE", err.Error())
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
@@ -67,31 +61,33 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	// Use decoder instead of unmarshal so we can handle stream data
 
 	decoder := json.NewDecoder(r.Body)
-	var requestMessageData poll.TaxiiPollRequestType
-	err = decoder.Decode(&requestMessageData)
+	var incomingMessageData pollMessage.PollRequestMessageType
+	err = decoder.Decode(&incomingMessageData)
 
 	if err != nil {
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Can not decode Poll Request")
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE, can not decode Poll Request")
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Check to make sure there is a message ID in the request message
-	if requestMessageData.TaxiiMessage.Id == "" {
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
+	if incomingMessageData.Id == "" {
+		statusMessageData := this.CreateTaxiiStatusMessage("", "BAD_MESSAGE", "Poll Request message did not include an ID")
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: BAD_MESSAGE, Poll Request message did not include an ID")
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 		return
 	}
 
 	// Log notice of incomming Poll Request
 	if this.SysConfig.Logging.LogLevel >= 1 {
-		log.Printf("DEBUG-1: Poll Request from %s for %s with ID: %s", r.RemoteAddr, requestMessageData.TaxiiMessage.CollectionName, requestMessageData.TaxiiMessage.Id)
+		log.Printf("DEBUG-1: Poll Request from %s for %s with ID: %s", r.RemoteAddr, incomingMessageData.CollectionName, incomingMessageData.Id)
 	}
 
 	// --------------------------------------------------
@@ -103,39 +99,41 @@ func (this *PollType) PollServerHandler(w http.ResponseWriter, r *http.Request) 
 	// TODO First check to make sure the value the requested is something they can actually get by their username / subscription / avaliable
 	// Based on the collection they are requesting, create a response that contains just the values for that collection
 
-	if _, ok := currentlyValidCollections[requestMessageData.TaxiiMessage.CollectionName]; ok {
-		data := this.createPollResponse(requestMessageData.TaxiiMessage.Id, requestMessageData.TaxiiMessage.CollectionName)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if _, ok := currentlyValidCollections[incomingMessageData.CollectionName]; ok {
+		data := this.createPollResponse(incomingMessageData.Id, incomingMessageData.CollectionName)
+
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: Sending Poll Response to", r.RemoteAddr)
 		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(data)
 	} else {
-		errmsg := "The requested collection \"" + requestMessageData.TaxiiMessage.CollectionName + "\" does not exist"
-		statusMessageData := statusMsg.CreateTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", errmsg)
+		errmsg := "The requested collection \"" + incomingMessageData.CollectionName + "\" does not exist"
+		statusMessageData := this.CreateTaxiiStatusMessage("", "DESTINATION_COLLECTION_ERROR", errmsg)
 		if this.SysConfig.Logging.LogLevel >= 1 {
 			log.Println("DEBUG-1: DESTINATION_COLLECTION_ERROR, Poll Request asked for a collection that does not exist")
 		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(statusMessageData)
 	}
 
 }
 
 // --------------------------------------------------
-// Create a TAXII Discovery Response Message
+// Create a TAXII Poll Response Message
 // --------------------------------------------------
 
-func (this *PollType) createPollResponse(responseid, collectionName string) []byte {
-	tm := poll.NewResponse()
+func (this *ServerType) createPollResponse(responseid, collectionName string) []byte {
+	tm := pollMessage.NewResponse()
 	tm.AddInResponseTo(responseid)
 	tm.AddCollectionName(collectionName)
 	tm.AddResultId("freetaxii-test-service-1")
 	tm.AddMessage("This is a test service for FreeTAXII")
-	content := poll.CreateContentBlock()
-	content.SetContentEncodingToXml()
+	content := tm.NewContentBlock()
+	content.SetContentEncodingToJson()
 	indicators := this.createIndicatorsJSON(collectionName)
 	content.AddContent(indicators)
-	tm.AddContentBlock(content)
 
 	data, err := json.Marshal(tm)
 	if err != nil {
@@ -146,7 +144,7 @@ func (this *PollType) createPollResponse(responseid, collectionName string) []by
 	return data
 }
 
-func (this *PollType) createIndicatorsJSON(collectionName string) string {
+func (this *ServerType) createIndicatorsJSON(collectionName string) string {
 
 	// Need to pass in the collection name they have requested
 	// then go to the database and the get the fields that are needed
@@ -233,11 +231,11 @@ func (this *PollType) createIndicatorsJSON(collectionName string) string {
 	}
 
 	var data []byte
-	if this.SysConfig.Poll.Indent == true {
-		data, _ = json.MarshalIndent(s, "", "    ")
-	} else {
-		data, _ = json.Marshal(s)
-	}
+	// if this.SysConfig.Poll.output == true {
+	data, _ = json.MarshalIndent(s, "", "    ")
+	// } else {
+	// 	data, _ = json.Marshal(s)
+	// }
 
 	return string(data)
 }
