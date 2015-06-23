@@ -9,7 +9,7 @@ package taxiiserver
 import (
 	"encoding/json"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/libtaxii/collectionMessage"
+	"github.com/freetaxii/libtaxii/messages/collectionMessage"
 	"log"
 	"net/http"
 )

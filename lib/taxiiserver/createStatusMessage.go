@@ -8,7 +8,7 @@ package taxiiserver
 
 import (
 	"encoding/json"
-	"github.com/freetaxii/libtaxii/statusMessage"
+	"github.com/freetaxii/libtaxii/messages/statusMessage"
 	"log"
 )
 

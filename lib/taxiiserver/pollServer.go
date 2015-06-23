@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"github.com/freestix/libstix/stix"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/libtaxii/pollMessage"
+	"github.com/freetaxii/libtaxii/messages/pollMessage"
 	"io/ioutil"
 	"log"
 	"net/http"

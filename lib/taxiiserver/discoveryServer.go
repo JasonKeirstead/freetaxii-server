@@ -10,7 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/freetaxii/freetaxii-server/lib/headers"
-	"github.com/freetaxii/libtaxii/discoveryMessage"
+	"github.com/freetaxii/libtaxii/messages/discoveryMessage"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
