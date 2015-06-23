@@ -17,7 +17,7 @@ import (
 // Log Level 1 = basic system logging information, sent to STDOUT unless Enabled = true then it is logged to a file
 // Log Level 2 =
 // Log Level 3 = detailed debugging information and code troubleshooting (like key variable changes)
-// Log Level 4 = function walk
+// Log Level 4 =
 // Log Level 5 = RAW packet/message decode and output
 
 type ServerConfigType struct {
@@ -37,6 +37,7 @@ type ServerConfigType struct {
 		Discovery  string
 		Collection string
 		Poll       string
+		Admin      string
 	}
 	Poll struct {
 		FormatOutput bool
@@ -44,7 +45,7 @@ type ServerConfigType struct {
 }
 
 // --------------------------------------------------
-// Load Configuration and Parse JSON File
+// Load Configuration File and Parse JSON
 // --------------------------------------------------
 
 func (this *ServerConfigType) LoadConfig(filename string) {

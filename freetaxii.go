@@ -120,6 +120,16 @@ func main() {
 	}
 
 	// --------------------------------------------------
+	// Setup Admin Server
+	// --------------------------------------------------
+
+	if syscfg.Services.Admin != "" {
+		log.Println("Starting TAXII Admin services at:", syscfg.Services.Admin)
+		http.HandleFunc(syscfg.Services.Admin, taxiiServerObject.AdminServerHandler)
+		//serviceCounter++  Do not count this service in the list
+	}
+
+	// --------------------------------------------------
 	// Fail if no services are running
 	// --------------------------------------------------
 
